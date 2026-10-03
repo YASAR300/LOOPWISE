@@ -44,9 +44,22 @@ const secondaryNavItems = [
   { label: "Settings", href: "/app/settings", icon: Settings },
 ];
 
-export function Sidebar({ initialCollapsed = false, className = "" }) {
+export function Sidebar({
+  initialCollapsed = false,
+  className = "",
+  currentUser = null,
+}) {
   const [collapsed, setCollapsed] = React.useState(initialCollapsed);
   const pathname = usePathname();
+
+  const orgs = currentUser?.memberships?.map((m) => m.organization) || [];
+  const activeOrgName = orgs[0]?.name || "Acme Enterprise";
+  const userInitials = (currentUser?.name || "Alex Carter")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -76,10 +89,14 @@ export function Sidebar({ initialCollapsed = false, className = "" }) {
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-xs font-semibold leading-tight text-text-primary">
-                    Acme Enterprise
+                    {activeOrgName}
                   </span>
                   <span className="truncate text-2xs leading-none text-text-muted">
-                    Pro Organization
+                    {currentUser?.role === "ADMIN"
+                      ? "Platform Admin"
+                      : currentUser?.role === "STRATEGIST"
+                        ? "Strategist Practice"
+                        : "Client Organization"}
                   </span>
                 </div>
                 <ChevronDown className="h-3 w-3 shrink-0 text-text-muted" />
@@ -87,14 +104,24 @@ export function Sidebar({ initialCollapsed = false, className = "" }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
-              <DropdownMenuItem className="gap-2">
-                <Building2 className="h-4 w-4 text-accent" />
-                <span>Acme Enterprise</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2">
-                <Building2 className="h-4 w-4 text-text-muted" />
-                <span>Global Dynamics AI</span>
-              </DropdownMenuItem>
+              {orgs.length > 0 ? (
+                orgs.map((org, idx) => (
+                  <DropdownMenuItem key={org.id} className="gap-2">
+                    <Building2
+                      className={cn(
+                        "h-4 w-4",
+                        idx === 0 ? "text-accent" : "text-text-muted"
+                      )}
+                    />
+                    <span className="truncate">{org.name}</span>
+                  </DropdownMenuItem>
+                ))
+              ) : (
+                <DropdownMenuItem className="gap-2">
+                  <Building2 className="h-4 w-4 text-accent" />
+                  <span>{activeOrgName}</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/dev/components">
@@ -240,16 +267,21 @@ export function Sidebar({ initialCollapsed = false, className = "" }) {
             >
               <Avatar
                 size={collapsed ? "sm" : "sm"}
-                fallback="YS"
-                alt="Yasar"
+                fallback={userInitials}
+                src={currentUser?.image || undefined}
+                alt={currentUser?.name || "User"}
               />
               {!collapsed && (
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-xs font-medium leading-tight text-text-primary">
-                    Yasar S.
+                    {currentUser?.name || "Alex Carter"}
                   </span>
                   <span className="truncate text-2xs leading-tight text-text-muted">
-                    Client Admin
+                    {currentUser?.role === "ADMIN"
+                      ? "Platform Admin"
+                      : currentUser?.role === "STRATEGIST"
+                        ? "Strategist"
+                        : "Client"}
                   </span>
                 </div>
               )}
@@ -265,10 +297,13 @@ export function Sidebar({ initialCollapsed = false, className = "" }) {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/login" className="text-semantic-danger">
+              <a
+                href="/api/auth/signout"
+                className="flex items-center text-semantic-danger"
+              >
                 <LogOut className="mr-2 h-3.5 w-3.5" />
                 <span>Log Out</span>
-              </Link>
+              </a>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
