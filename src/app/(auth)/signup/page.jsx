@@ -1,300 +1,511 @@
 "use client";
 
-import * as React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
-  Mail,
-  Lock,
-  User,
-  Briefcase,
-  Sparkles,
-  AlertCircle,
-  CheckCircle2,
+  ArrowLeft,
   Loader2,
+  Building,
+  CheckCircle2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+  AuthPanel,
+  RoleCardGroup,
+  SocialButton,
+  OrDivider,
+  PasswordInput,
+  PasswordStrengthMeter,
+  evaluatePassword,
+  FormAlert,
+  useAuthContext,
+} from "@/components/auth";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
-  const [role, setRole] = React.useState("CLIENT"); // CLIENT or STRATEGIST
-  const [name, setName] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [googleLoading, setGoogleLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [success, setSuccess] = React.useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { setRole: setShellRole } = useAuthContext();
 
-  const supabase = createClient();
+  const roleParam = searchParams.get("role") || "";
+  const returnTo = searchParams.get("returnTo") || "";
+  const intentParam = searchParams.get("intent") || "";
+
+  const initialRole =
+    roleParam.toLowerCase() === "strategist" ? "STRATEGIST" : "CLIENT";
+
+  const [step, setStep] = useState(1);
+  const [role, setRole] = useState(initialRole);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [termsAgreed, setTermsAgreed] = useState(false);
+
+  // Field validation and existence check
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailExists, setEmailExists] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [serverAlert, setServerAlert] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const headingRef = useRef(null);
+
+  // Sync role with shell side panel
+  useEffect(() => {
+    setShellRole(role);
+  }, [role, setShellRole]);
+
+  // Handle focus when step changes
+  useEffect(() => {
+    if (headingRef.current) {
+      headingRef.current.focus();
+    }
+  }, [step]);
+
+  const handleRoleChange = (selectedRole) => {
+    setRole(selectedRole);
+  };
+
+  const handleContinueToStep2 = () => {
+    setStep(2);
+  };
+
+  const handleBackToStep1 = () => {
+    setStep(1);
+    setServerAlert(null);
+  };
+
+  // Check email on blur
+  const handleEmailBlur = async () => {
+    if (!email || !email.includes("@")) return;
+
+    setEmailChecking(true);
+    setEmailExists(false);
+
+    try {
+      const res = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+      if (data?.exists) {
+        setEmailExists(true);
+      }
+    } catch {
+      // Fail silently on check error
+    } finally {
+      setEmailChecking(false);
+    }
+  };
+
+  const validateForm = () => {
+    const errs = {};
+    if (!name.trim()) errs.name = "Full name is required";
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errs.email = "Enter a valid work email address";
+    }
+    const { score } = evaluatePassword(password);
+    if (password.length < 8) {
+      errs.password = "Password must be at least 8 characters";
+    }
+    if (!termsAgreed) {
+      errs.terms = "You must agree to the Terms and Privacy Policy to continue";
+    }
+    return errs;
+  };
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    setServerAlert(null);
+
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    setErrors({});
     setLoading(true);
-    setError("");
 
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          role,
+          companyName: role === "CLIENT" ? companyName.trim() : undefined,
+        }),
       });
 
       const data = await res.json();
+
       if (!res.ok) {
-        setError(data.error || "Failed to create account");
         setLoading(false);
+        setServerAlert({
+          type: "error",
+          message: data.error || "Unable to create account. Please try again.",
+        });
         return;
       }
 
-      setSuccess(true);
-      setLoading(false);
+      // Success: redirect to verification pending screen with email
+      const verifyParams = new URLSearchParams({ email: email.trim() });
+      if (returnTo) verifyParams.set("returnTo", returnTo);
+      if (intentParam) verifyParams.set("intent", intentParam);
+
+      router.push(`/verify-email?${verifyParams.toString()}`);
     } catch {
-      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
+      setServerAlert({
+        type: "error",
+        message: "Network error occurred during signup. Please retry.",
+      });
     }
   };
 
   const handleGoogleSignup = async () => {
     setGoogleLoading(true);
-    setError("");
+    setServerAlert(null);
     const appUrl = window.location.origin;
 
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        queryParams: { access_type: "offline", prompt: "consent" },
-        redirectTo: `${appUrl}/api/auth/callback`,
-        data: { role },
-      },
-    });
+    const queryParams = new URLSearchParams();
+    if (returnTo) queryParams.set("returnTo", returnTo);
+    if (role) queryParams.set("role", role);
+    if (intentParam) queryParams.set("intent", intentParam);
 
-    if (oauthError) {
-      setError(oauthError.message);
+    try {
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          queryParams: { access_type: "offline", prompt: "consent" },
+          redirectTo: `${appUrl}/api/auth/callback${queryParams.toString() ? `?${queryParams.toString()}` : ""}`,
+          data: { role },
+        },
+      });
+
+      if (oauthError) {
+        setServerAlert({
+          type: "error",
+          message: oauthError.message || "Failed to continue with Google.",
+        });
+        setGoogleLoading(false);
+      }
+    } catch {
+      setServerAlert({
+        type: "error",
+        message: "Google OAuth could not be initiated.",
+      });
       setGoogleLoading(false);
     }
   };
 
-  if (success) {
-    return (
-      <Card raised className="border-border-hairline shadow-2xl">
-        <CardHeader className="pb-4 text-center">
-          <div className="bg-semantic-success/15 mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full text-semantic-success">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <CardTitle className="text-lg">Check your inbox</CardTitle>
-          <CardDescription>
-            We&apos;ve sent a verification link to{" "}
-            <span className="font-semibold text-text-primary">{email}</span>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-center">
-          <p className="text-xs text-text-muted">
-            Click the link in the email to verify your address and activate your
-            account.
-          </p>
-        </CardContent>
-        <CardFooter className="border-border-hairline/60 justify-center border-t pt-3">
-          <Link
-            href="/login"
-            className="text-xs font-medium text-accent hover:underline"
-          >
-            Back to Sign In
-          </Link>
-        </CardFooter>
-      </Card>
-    );
-  }
+  const loginParams = new URLSearchParams();
+  if (returnTo) loginParams.set("returnTo", returnTo);
+  if (roleParam) loginParams.set("role", roleParam);
+  if (intentParam) loginParams.set("intent", intentParam);
+  const loginHref = `/login${loginParams.toString() ? `?${loginParams.toString()}` : ""}`;
 
   return (
-    <Card raised className="border-border-hairline shadow-2xl">
-      <CardHeader className="pb-4 text-center">
-        <CardTitle className="text-lg">Create your account</CardTitle>
-        <CardDescription>
-          Join Loopwise to deploy vetted fractional AI strategists.
-        </CardDescription>
-      </CardHeader>
+    <AuthPanel>
+      {/* STEP 1: ROLE SELECTION */}
+      {step === 1 && (
+        <div className="animate-in fade-in space-y-6 duration-200">
+          <div className="space-y-1">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-display text-xl font-bold tracking-tight text-ink outline-none"
+            >
+              How will you use Loopwise?
+            </h1>
+            <p className="text-xs text-ink-3">
+              Select how you intend to engage with our verified automation
+              network.
+            </p>
+          </div>
 
-      <CardContent className="space-y-4">
-        {/* Role Selector */}
-        <div className="space-y-1.5">
-          <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-            I am joining as:
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setRole("CLIENT")}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-all",
-                role === "CLIENT"
-                  ? "bg-accent/10 border-accent font-medium text-accent shadow-sm"
-                  : "hover:border-border-hairline/80 border-border-hairline bg-surface-base text-text-secondary hover:bg-surface-highlight"
-              )}
+          <RoleCardGroup value={role} onChange={handleRoleChange} />
+
+          <button
+            type="button"
+            onClick={handleContinueToStep2}
+            className="btn-primary-indigo shadow-xs active:scale-98 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-transform sm:text-sm"
+          >
+            <span>Continue</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="border-t border-line pt-1 text-center text-xs text-ink-3">
+            Already have an account?{" "}
+            <Link
+              href={loginHref}
+              className="font-semibold text-brand-indigo hover:underline"
             >
-              <Briefcase className="h-4 w-4" />
-              <span className="text-xs">Client (Hire AI)</span>
-              <span className="text-2xs text-text-muted">
-                Enterprises & Startups
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole("STRATEGIST")}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-all",
-                role === "STRATEGIST"
-                  ? "bg-accent/10 border-accent font-medium text-accent shadow-sm"
-                  : "hover:border-border-hairline/80 border-border-hairline bg-surface-base text-text-secondary hover:bg-surface-highlight"
-              )}
-            >
-              <Sparkles className="h-4 w-4" />
-              <span className="text-xs">AI Strategist</span>
-              <span className="text-2xs text-text-muted">
-                Heads of AI & Leaders
-              </span>
-            </button>
+              Sign in
+            </Link>
           </div>
         </div>
+      )}
 
-        {error && (
-          <div className="border-semantic-danger/30 bg-semantic-danger/10 flex items-center gap-2 rounded-md border px-3 py-2 text-xs text-semantic-danger">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
+      {/* STEP 2: CREDENTIALS & DETAILS */}
+      {step === 2 && (
+        <div className="animate-in fade-in space-y-5 duration-200">
+          {/* Header with back link */}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={handleBackToStep1}
+              className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-ink-3 transition-colors hover:text-ink"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Change role</span>
+            </button>
+
+            <span className="rounded-full bg-brand-accent-soft px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-brand-accent">
+              {role === "CLIENT" ? "Client Account" : "Strategist Account"}
+            </span>
           </div>
-        )}
 
-        <Button
-          type="button"
-          variant="outline"
-          size="md"
-          className="w-full gap-2 border-border-hairline hover:bg-surface-highlight"
-          onClick={handleGoogleSignup}
-          disabled={googleLoading || loading}
-        >
-          {googleLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <svg className="h-4 w-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
+          <div className="space-y-1">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-display text-xl font-bold tracking-tight text-ink outline-none"
+            >
+              Create your account
+            </h1>
+            <p className="text-xs text-ink-3">
+              {role === "CLIENT"
+                ? "Deploy verified AI strategists and autonomous fleet nodes."
+                : "Join the top 3% fractional AI leaders with guaranteed escrow."}
+            </p>
+          </div>
+
+          {serverAlert && (
+            <FormAlert
+              type={serverAlert.type}
+              message={serverAlert.message}
+              onDismiss={() => setServerAlert(null)}
+            />
           )}
-          <span>Sign up with Google</span>
-        </Button>
 
-        <div className="relative flex items-center justify-center">
-          <div className="absolute inset-0 flex items-center border-border-hairline">
-            <div className="w-full border-t border-border-hairline" />
-          </div>
-          <span className="relative bg-surface-raised px-2 text-2xs uppercase tracking-wider text-text-muted">
-            Or with email
-          </span>
-        </div>
+          {/* Social Google Signup */}
+          <SocialButton
+            onClick={handleGoogleSignup}
+            loading={googleLoading}
+            disabled={loading}
+            text="Sign up with Google"
+          />
 
-        <form onSubmit={handleSignup} className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-              Full Name
-            </label>
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Elena Rostova"
-              leftIcon={<User className="h-4 w-4" />}
-              required
-              disabled={loading || googleLoading}
-            />
-          </div>
+          <OrDivider label="or" />
 
-          <div className="space-y-1.5">
-            <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-              Work Email
-            </label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="elena@enterprise.com"
-              leftIcon={<Mail className="h-4 w-4" />}
-              required
-              disabled={loading || googleLoading}
-            />
-          </div>
+          {/* Email Availability Notice */}
+          {emailExists && (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+              <span>This email already has an account.</span>
+              <Link
+                href={`/login?email=${encodeURIComponent(email)}`}
+                className="font-bold underline hover:text-amber-950 dark:hover:text-amber-100"
+              >
+                Log in?
+              </Link>
+            </div>
+          )}
 
-          <div className="space-y-1.5">
-            <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-              Password
-            </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              leftIcon={<Lock className="h-4 w-4" />}
-              required
-              minLength={8}
-              disabled={loading || googleLoading}
-            />
-          </div>
+          <form onSubmit={handleSignup} noValidate className="space-y-3.5">
+            {/* Full Name */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="signup-name"
+                className="block text-xs font-semibold text-ink-2"
+              >
+                Full Name
+              </label>
+              <input
+                id="signup-name"
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (errors.name) setErrors({ ...errors, name: "" });
+                }}
+                autoComplete="name"
+                required
+                disabled={loading || googleLoading}
+                placeholder="Alex Carter"
+                className={`duration-160 focus:outline-hidden h-11 w-full rounded-xl border bg-panel-2 px-3.5 text-xs text-ink transition-all placeholder:text-ink-3 focus:border-transparent focus:ring-2 focus:ring-brand-indigo sm:text-sm ${
+                  errors.name
+                    ? "border-[#B42318] focus:ring-[#B42318]"
+                    : "border-line hover:border-line-2"
+                }`}
+              />
+              {errors.name && (
+                <p className="text-[11px] font-medium text-[#B42318] dark:text-[#F87171]">
+                  {errors.name}
+                </p>
+              )}
+            </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            className="w-full gap-2"
-            disabled={loading || googleLoading}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <span>
-                  Create {role === "CLIENT" ? "Client" : "Strategist"} Account
-                </span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </>
+            {/* Work Email */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="signup-email"
+                className="block text-xs font-semibold text-ink-2"
+              >
+                Work Email
+              </label>
+              <input
+                id="signup-email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors({ ...errors, email: "" });
+                  if (emailExists) setEmailExists(false);
+                }}
+                onBlur={handleEmailBlur}
+                autoComplete="email"
+                required
+                disabled={loading || googleLoading}
+                placeholder="name@company.com"
+                className={`duration-160 focus:outline-hidden h-11 w-full rounded-xl border bg-panel-2 px-3.5 text-xs text-ink transition-all placeholder:text-ink-3 focus:border-transparent focus:ring-2 focus:ring-brand-indigo sm:text-sm ${
+                  errors.email
+                    ? "border-[#B42318] focus:ring-[#B42318]"
+                    : "border-line hover:border-line-2"
+                }`}
+              />
+              {errors.email && (
+                <p className="text-[11px] font-medium text-[#B42318] dark:text-[#F87171]">
+                  {errors.email}
+                </p>
+              )}
+            </div>
+
+            {/* Optional Company Name (Clients only, 160ms height transition) */}
+            {role === "CLIENT" && (
+              <div className="duration-160 space-y-1.5 transition-all">
+                <label
+                  htmlFor="signup-company"
+                  className="block text-xs font-semibold text-ink-2"
+                >
+                  Company Name{" "}
+                  <span className="text-[10px] font-normal text-ink-3">
+                    (Optional)
+                  </span>
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    id="signup-company"
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    autoComplete="organization"
+                    disabled={loading || googleLoading}
+                    placeholder="Acme Corp"
+                    className="duration-160 focus:outline-hidden h-11 w-full rounded-xl border border-line bg-panel-2 px-3.5 text-xs text-ink transition-all placeholder:text-ink-3 hover:border-line-2 focus:border-transparent focus:ring-2 focus:ring-brand-indigo sm:text-sm"
+                  />
+                </div>
+              </div>
             )}
-          </Button>
-        </form>
-      </CardContent>
 
-      <CardFooter className="border-border-hairline/60 justify-center border-t pt-3">
-        <p className="text-2xs text-text-secondary">
-          Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-accent hover:underline"
-          >
-            Sign in
-          </Link>
-        </p>
-      </CardFooter>
-    </Card>
+            {/* Password with live strength meter + rule checklist */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="signup-password"
+                className="block text-xs font-semibold text-ink-2"
+              >
+                Password
+              </label>
+              <PasswordInput
+                id="signup-password"
+                name="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors({ ...errors, password: "" });
+                }}
+                autoComplete="new-password"
+                required
+                disabled={loading || googleLoading}
+                error={errors.password}
+              />
+              <PasswordStrengthMeter password={password} showRules={true} />
+            </div>
+
+            {/* Terms Checkbox */}
+            <div className="pt-1">
+              <label className="flex cursor-pointer select-none items-start gap-2.5 text-xs text-ink-2">
+                <input
+                  type="checkbox"
+                  checked={termsAgreed}
+                  onChange={(e) => {
+                    setTermsAgreed(e.target.checked);
+                    if (errors.terms) setErrors({ ...errors, terms: "" });
+                  }}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-line text-brand-indigo accent-[#4B3FD6] focus:ring-brand-indigo"
+                />
+                <span className="leading-snug">
+                  I agree to the{" "}
+                  <Link
+                    href="/terms"
+                    target="_blank"
+                    className="font-semibold text-brand-indigo hover:underline"
+                  >
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    target="_blank"
+                    className="font-semibold text-brand-indigo hover:underline"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+              {errors.terms && (
+                <p className="mt-1 text-[11px] font-medium text-[#B42318] dark:text-[#F87171]">
+                  {errors.terms}
+                </p>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading || googleLoading}
+              className="btn-primary-indigo shadow-xs active:scale-98 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-transform disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-white" />
+              ) : (
+                <>
+                  <span>Create account</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="border-t border-line pt-1 text-center text-xs text-ink-3">
+            Already have an account?{" "}
+            <Link
+              href={loginHref}
+              className="font-semibold text-brand-indigo hover:underline"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      )}
+    </AuthPanel>
   );
 }
