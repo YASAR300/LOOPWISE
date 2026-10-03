@@ -30,6 +30,16 @@ export async function getCurrentUser() {
 }
 
 /**
+ * Get active session object { user }
+ * Returns null if not authenticated.
+ */
+export async function getSession() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return { user };
+}
+
+/**
  * Get active organization from cookie or first membership.
  */
 export async function getActiveOrg(user) {
