@@ -1,20 +1,18 @@
 "use client";
 
-import * as React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Loader2, ArrowRight } from "lucide-react";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+  AuthPanel,
+  SocialButton,
+  OrDivider,
+  PasswordInput,
+  FormAlert,
+  useCooldown,
+} from "@/components/auth";
+import { LogoLoader } from "@/components/ui/logo-loader";
 import { createClient } from "@/lib/supabase/client";
 
 const DEMO_ACCOUNTS = [
@@ -27,232 +25,412 @@ const DEMO_ACCOUNTS = [
   },
 ];
 
+function isSafeInternalPath(path) {
+  if (!path || typeof path !== "string") return false;
+  return (
+    path.startsWith("/") && !path.startsWith("//") && !path.includes("://")
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get("redirect");
+
+  const returnTo =
+    searchParams.get("returnTo") || searchParams.get("redirect") || "";
+  const roleParam = searchParams.get("role") || "";
+  const intentParam = searchParams.get("intent") || "";
   const urlError = searchParams.get("error");
 
-  const [email, setEmail] = React.useState("alex.carter@enterprise.ai");
-  const [password, setPassword] = React.useState("demo123456");
-  const [loading, setLoading] = React.useState(false);
-  const [googleLoading, setGoogleLoading] = React.useState(false);
-  const [error, setError] = React.useState(
-    urlError ? decodeURIComponent(urlError) : ""
+  const [email, setEmail] = useState("alex.carter@enterprise.ai");
+  const [password, setPassword] = useState("demo123456");
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Field validation states
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
+  // Submission & alert states
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [serverAlert, setServerAlert] = useState(
+    urlError ? { type: "error", message: decodeURIComponent(urlError) } : null
   );
 
-  const supabase = createClient();
+  const emailInputRef = useRef(null);
+  const { remaining, isCoolingDown, startCooldown } = useCooldown(
+    60,
+    "resend_verification"
+  );
+
+  // Autofocus email on mount
+  useEffect(() => {
+    emailInputRef.current?.focus();
+  }, []);
+
+  const validateEmail = (val) => {
+    if (!val || !val.trim()) {
+      return "Email is required";
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(val.trim())) {
+      return "Enter a valid work email address";
+    }
+    return "";
+  };
+
+  const handleEmailBlur = () => {
+    setEmailTouched(true);
+    setEmailError(validateEmail(email));
+  };
 
   const handleSignIn = async (e) => {
     e.preventDefault();
+    setServerAlert(null);
+
+    const errE = validateEmail(email);
+    const errP = !password ? "Password is required" : "";
+
+    if (errE || errP) {
+      setEmailError(errE);
+      setPasswordError(errP);
+      if (errE) emailInputRef.current?.focus();
+      return;
+    }
+
     setLoading(true);
-    setError("");
 
     try {
+      const supabase = createClient();
       const { data, error: signInError } =
         await supabase.auth.signInWithPassword({
-          email,
+          email: email.trim(),
           password,
         });
 
       if (signInError) {
-        setError(signInError.message);
         setLoading(false);
+        const msg = signInError.message.toLowerCase();
+
+        if (msg.includes("email not confirmed") || msg.includes("unverified")) {
+          setServerAlert({
+            type: "warning",
+            message: "Your email address has not been verified yet.",
+            description:
+              "Please check your inbox or request a new confirmation email below.",
+            isUnverified: true,
+          });
+        } else if (
+          msg.includes("rate limit") ||
+          msg.includes("too many requests")
+        ) {
+          setServerAlert({
+            type: "error",
+            message: "Too many failed attempts. Account temporarily locked.",
+            description: "Please wait 60 seconds before trying again.",
+          });
+        } else {
+          setServerAlert({
+            type: "error",
+            message: "Invalid email or password. Please verify and try again.",
+          });
+        }
         return;
       }
 
-      // Check role from user_metadata
-      const role = data.user?.user_metadata?.role || "CLIENT";
-      const roleHome = {
-        CLIENT: "/client/dashboard",
-        STRATEGIST: "/strategist/dashboard",
-        ADMIN: "/admin/dashboard",
-      };
+      // Success path: show LogoLoader transition
+      setIsSigningIn(true);
 
-      const dest = redirectPath || roleHome[role] || "/app";
-      router.push(dest);
-      router.refresh();
+      const userRole = data.user?.user_metadata?.role || "CLIENT";
+      const defaultDest =
+        userRole === "ADMIN"
+          ? "/admin/dashboard"
+          : userRole === "STRATEGIST"
+            ? "/strategist/dashboard"
+            : "/client/dashboard";
+
+      const finalDest = isSafeInternalPath(returnTo) ? returnTo : defaultDest;
+
+      setTimeout(() => {
+        router.push(finalDest);
+        router.refresh();
+      }, 700);
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
+      setServerAlert({
+        type: "error",
+        message: "An unexpected error occurred while logging in. Please retry.",
+      });
     }
   };
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    setError("");
+    setServerAlert(null);
     const appUrl = window.location.origin;
 
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${appUrl}/api/auth/callback${redirectPath ? `?next=${encodeURIComponent(redirectPath)}` : ""}`,
-      },
-    });
+    const queryParams = new URLSearchParams();
+    if (returnTo) queryParams.set("returnTo", returnTo);
+    if (roleParam) queryParams.set("role", roleParam);
+    if (intentParam) queryParams.set("intent", intentParam);
 
-    if (oauthError) {
-      setError(oauthError.message);
+    const redirectUri = `${appUrl}/api/auth/callback${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+
+    try {
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUri,
+        },
+      });
+
+      if (oauthError) {
+        setServerAlert({
+          type: "error",
+          message: oauthError.message || "Failed to sign in with Google.",
+        });
+        setGoogleLoading(false);
+      }
+    } catch {
+      setServerAlert({
+        type: "error",
+        message: "Google OAuth could not be initiated.",
+      });
       setGoogleLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (isCoolingDown || !email) return;
+    startCooldown(60);
+
+    try {
+      const supabase = createClient();
+      await supabase.auth.resend({
+        type: "signup",
+        email: email.trim(),
+      });
+      setServerAlert({
+        type: "success",
+        message: "Verification email resent successfully!",
+        description: `Check your inbox at ${email.trim()}.`,
+      });
+    } catch {
+      setServerAlert({
+        type: "error",
+        message: "Failed to resend confirmation email.",
+      });
     }
   };
 
   const fillDemo = (acc) => {
     setEmail(acc.email);
     setPassword("demo123456");
-    setError("");
+    setEmailError("");
+    setPasswordError("");
+    setServerAlert(null);
   };
 
-  return (
-    <Card raised className="border-border-hairline shadow-2xl">
-      <CardHeader className="pb-4 text-center">
-        <div className="mx-auto mb-2">
-          <Badge variant="accent" size="xs">
-            Supabase Auth
-          </Badge>
-        </div>
-        <CardTitle className="text-lg">Sign in to Loopwise</CardTitle>
-        <CardDescription>
-          Enter your organization email to access your workspace.
-        </CardDescription>
-      </CardHeader>
+  // Build signup href preserving returnTo, role, intent
+  const signupParams = new URLSearchParams();
+  if (returnTo) signupParams.set("returnTo", returnTo);
+  if (roleParam) signupParams.set("role", roleParam);
+  if (intentParam) signupParams.set("intent", intentParam);
+  const signupHref = `/signup${signupParams.toString() ? `?${signupParams.toString()}` : ""}`;
 
-      <CardContent className="space-y-4">
-        {error && (
-          <div className="border-semantic-danger/30 bg-semantic-danger/10 flex items-center gap-2 rounded-md border px-3 py-2 text-xs text-semantic-danger">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
+  if (isSigningIn) {
+    return (
+      <AuthPanel>
+        <LogoLoader label="Signing you in to Loopwise..." />
+      </AuthPanel>
+    );
+  }
+
+  return (
+    <AuthPanel>
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="space-y-1">
+          <h1 className="font-display text-xl font-bold tracking-tight text-ink">
+            Sign in to Loopwise
+          </h1>
+          <p className="text-xs text-ink-3">
+            Access your active automations, proposals, and team fleet.
+          </p>
+        </div>
+
+        {/* Server Alert Banner */}
+        {serverAlert && (
+          <FormAlert
+            type={serverAlert.type}
+            message={serverAlert.message}
+            description={serverAlert.description}
+            onDismiss={() => setServerAlert(null)}
+            action={
+              serverAlert.isUnverified ? (
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={isCoolingDown}
+                  className="btn-secondary-outline mt-1 cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+                >
+                  {isCoolingDown
+                    ? `Resend in ${remaining}s`
+                    : "Resend verification email"}
+                </button>
+              ) : null
+            }
+          />
         )}
 
-        <Button
-          type="button"
-          variant="outline"
-          size="md"
-          className="w-full gap-2 border-border-hairline hover:bg-surface-highlight"
+        {/* Google OAuth Button */}
+        <SocialButton
           onClick={handleGoogleSignIn}
-          disabled={googleLoading || loading}
-        >
-          {googleLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <svg className="h-4 w-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-          )}
-          <span>Continue with Google</span>
-        </Button>
+          loading={googleLoading}
+          disabled={loading}
+          text="Continue with Google"
+        />
 
-        <div className="relative flex items-center justify-center">
-          <div className="absolute inset-0 flex items-center border-border-hairline">
-            <div className="w-full border-t border-border-hairline" />
-          </div>
-          <span className="relative bg-surface-raised px-2 text-2xs uppercase tracking-wider text-text-muted">
-            Or with email
-          </span>
-        </div>
+        {/* Or Divider */}
+        <OrDivider label="or" />
 
-        <form onSubmit={handleSignIn} className="space-y-3">
+        {/* Credentials Form */}
+        <form onSubmit={handleSignIn} noValidate className="space-y-3.5">
+          {/* Email Field */}
           <div className="space-y-1.5">
-            <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
+            <label
+              htmlFor="login-email"
+              className="block text-xs font-semibold text-ink-2"
+            >
               Work Email
             </label>
-            <Input
+            <input
+              ref={emailInputRef}
+              id="login-email"
+              name="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              leftIcon={<Mail className="h-4 w-4" />}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError("");
+              }}
+              onBlur={handleEmailBlur}
+              autoComplete="email"
               required
               disabled={loading || googleLoading}
+              placeholder="alex.carter@enterprise.ai"
+              aria-invalid={Boolean(emailError)}
+              aria-describedby={emailError ? "email-error" : undefined}
+              className={`duration-160 focus:outline-hidden h-11 w-full rounded-xl border bg-panel-2 px-3.5 text-xs text-ink transition-all placeholder:text-ink-3 focus:border-transparent focus:ring-2 focus:ring-brand-indigo sm:text-sm ${
+                emailError
+                  ? "border-[#B42318] focus:ring-[#B42318] dark:border-[#F87171]"
+                  : "border-line hover:border-line-2"
+              }`}
             />
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-                Password
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-2xs text-text-muted hover:text-text-primary"
+            {emailError && (
+              <p
+                id="email-error"
+                className="text-[11px] font-medium text-[#B42318] dark:text-[#F87171]"
               >
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              type="password"
+                {emailError}
+              </p>
+            )}
+          </div>
+
+          {/* Password Field */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="login-password"
+              className="block text-xs font-semibold text-ink-2"
+            >
+              Password
+            </label>
+            <PasswordInput
+              id="login-password"
+              name="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              leftIcon={<Lock className="h-4 w-4" />}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (passwordError) setPasswordError("");
+              }}
+              autoComplete="current-password"
               required
               disabled={loading || googleLoading}
+              error={passwordError}
+              aria-describedby={passwordError ? "password-error" : undefined}
             />
           </div>
 
-          <Button
+          {/* Remember Me + Forgot Password Row */}
+          <div className="flex items-center justify-between pt-0.5 text-xs">
+            <label className="flex cursor-pointer select-none items-center gap-2 text-ink-2 hover:text-ink">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-3.5 w-3.5 cursor-pointer rounded border-line text-brand-indigo accent-[#4B3FD6] focus:ring-brand-indigo"
+              />
+              <span className="font-medium">Remember me</span>
+            </label>
+
+            <Link
+              href="/forgot-password"
+              className="text-xs font-medium text-ink-3 transition-colors hover:text-brand-indigo"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          {/* Full-width Indigo Primary Button */}
+          <button
             type="submit"
-            variant="primary"
-            size="md"
-            className="w-full gap-2"
             disabled={loading || googleLoading}
+            className="btn-primary-indigo shadow-xs active:scale-98 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-transform disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
           >
             {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
             ) : (
               <>
-                <span>Sign In</span>
+                <span>Sign in</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </>
             )}
-          </Button>
+          </button>
         </form>
 
-        <div className="border-border-hairline/60 border-t pt-3">
-          <div className="mb-2 text-center">
-            <span className="text-2xs text-text-muted">Quick Demo Logins:</span>
-          </div>
+        {/* Demo Credentials Bar */}
+        <div className="space-y-2 border-t border-line pt-3">
+          <p className="text-center font-mono text-[10px] uppercase tracking-wider text-ink-3">
+            Quick Demo Login
+          </p>
           <div className="grid grid-cols-3 gap-1.5">
             {DEMO_ACCOUNTS.map((acc) => (
               <button
                 key={acc.role}
                 type="button"
                 onClick={() => fillDemo(acc)}
-                className="hover:border-accent/40 rounded border border-border-hairline bg-surface-base px-2 py-1 text-center text-2xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+                className="cursor-pointer truncate rounded-lg border border-line bg-panel-2 px-2 py-1 text-center text-[11px] font-medium text-ink-2 transition-colors hover:bg-panel hover:text-ink"
               >
                 {acc.label}
               </button>
             ))}
           </div>
         </div>
-      </CardContent>
 
-      <CardFooter className="border-border-hairline/60 justify-center border-t pt-3">
-        <p className="text-2xs text-text-secondary">
-          Don&apos;t have an account?{" "}
+        {/* Bottom Switch Link */}
+        <div className="pt-1 text-center text-xs text-ink-3">
+          New to Loopwise?{" "}
           <Link
-            href="/signup"
-            className="font-medium text-accent hover:underline"
+            href={signupHref}
+            className="font-semibold text-brand-indigo hover:underline"
           >
-            Sign up
+            Create an account
           </Link>
-        </p>
-      </CardFooter>
-    </Card>
+        </div>
+      </div>
+    </AuthPanel>
   );
 }
