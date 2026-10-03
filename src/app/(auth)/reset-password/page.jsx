@@ -1,177 +1,190 @@
 "use client";
 
-import * as React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 import {
-  ArrowRight,
-  Lock,
-  AlertCircle,
-  CheckCircle2,
-  Loader2,
-  ArrowLeft,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+  AuthPanel,
+  PasswordInput,
+  PasswordStrengthMeter,
+  evaluatePassword,
+  FormAlert,
+  StatusScreen,
+} from "@/components/auth";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const [password, setPassword] = React.useState("");
-  const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [success, setSuccess] = React.useState(false);
+  const searchParams = useSearchParams();
 
-  const supabase = createClient();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const handleReset = async (e) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
+    setError("");
+
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
     }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
 
     setLoading(true);
-    setError("");
 
     try {
+      const supabase = createClient();
       const { error: resetError } = await supabase.auth.updateUser({
         password,
       });
 
       if (resetError) {
-        setError(resetError.message);
+        if (resetError.message?.toLowerCase().includes("expired")) {
+          setError(
+            "Your password reset link has expired. Please request a new one."
+          );
+        } else {
+          setError(resetError.message || "Failed to update password");
+        }
         setLoading(false);
         return;
       }
 
       setSuccess(true);
       setLoading(false);
-      setTimeout(() => {
-        router.push("/login");
-      }, 2500);
     } catch {
-      setError("Failed to reset password. The link may have expired.");
+      setError("An unexpected error occurred while updating your password.");
       setLoading(false);
     }
   };
 
   if (success) {
     return (
-      <Card raised className="border-border-hairline shadow-2xl">
-        <CardHeader className="pb-4 text-center">
-          <div className="bg-semantic-success/15 mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full text-semantic-success">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <CardTitle className="text-lg">Password updated!</CardTitle>
-          <CardDescription>
-            Your password has been changed successfully. Redirecting you to sign
-            in...
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="border-border-hairline/60 justify-center border-t pt-3">
-          <Link
-            href="/login"
-            className="text-xs font-medium text-accent hover:underline"
-          >
-            Click here if not redirected automatically
-          </Link>
-        </CardFooter>
-      </Card>
+      <AuthPanel>
+        <StatusScreen
+          type="success"
+          title="Password updated successfully"
+          description="Your credentials have been securely updated. You can now sign in with your new password."
+          actions={
+            <Link
+              href="/login"
+              className="btn-primary-indigo flex h-11 w-full items-center justify-center gap-2 rounded-xl text-xs font-semibold"
+            >
+              <span>Sign in with new password</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          }
+        />
+      </AuthPanel>
     );
   }
 
   return (
-    <Card raised className="border-border-hairline shadow-2xl">
-      <CardHeader className="pb-4 text-center">
-        <CardTitle className="text-lg">Set new password</CardTitle>
-        <CardDescription>
-          Choose a secure password for your Loopwise account.
-        </CardDescription>
-      </CardHeader>
+    <AuthPanel>
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <Link
+            href="/login"
+            className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-3 transition-colors hover:text-ink"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to sign in</span>
+          </Link>
+          <h1 className="font-display text-xl font-bold tracking-tight text-ink">
+            Set new password
+          </h1>
+          <p className="text-xs leading-relaxed text-ink-3">
+            Choose a strong password to protect your autonomous workspace.
+          </p>
+        </div>
 
-      <CardContent className="space-y-4">
         {error && (
-          <div className="border-semantic-danger/30 bg-semantic-danger/10 flex items-center gap-2 rounded-md border px-3 py-2 text-xs text-semantic-danger">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
+          <FormAlert
+            type="error"
+            message={error}
+            onDismiss={() => setError("")}
+            action={
+              error.includes("expired") ? (
+                <Link
+                  href="/forgot-password"
+                  className="mt-1 inline-block text-xs font-semibold underline"
+                >
+                  Request a new link
+                </Link>
+              ) : null
+            }
+          />
         )}
 
-        <form onSubmit={handleReset} className="space-y-3">
+        <form onSubmit={handleReset} noValidate className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
+            <label
+              htmlFor="new-password"
+              className="block text-xs font-semibold text-ink-2"
+            >
               New Password
             </label>
-            <Input
-              type="password"
+            <PasswordInput
+              id="new-password"
+              name="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              leftIcon={<Lock className="h-4 w-4" />}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError("");
+              }}
+              autoComplete="new-password"
               required
-              minLength={8}
               disabled={loading}
+              placeholder="Minimum 8 characters"
             />
+            <PasswordStrengthMeter password={password} showRules={true} />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-              Confirm New Password
+            <label
+              htmlFor="confirm-password"
+              className="block text-xs font-semibold text-ink-2"
+            >
+              Confirm Password
             </label>
-            <Input
-              type="password"
+            <PasswordInput
+              id="confirm-password"
+              name="confirmPassword"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              leftIcon={<Lock className="h-4 w-4" />}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                if (error) setError("");
+              }}
+              autoComplete="new-password"
               required
-              minLength={8}
               disabled={loading}
+              placeholder="Re-enter your password"
             />
           </div>
 
-          <Button
+          <button
             type="submit"
-            variant="primary"
-            size="md"
-            className="w-full gap-2"
-            disabled={loading}
+            disabled={loading || !password || !confirmPassword}
+            className="btn-primary-indigo shadow-xs active:scale-98 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-transform disabled:opacity-50 sm:text-sm"
           >
             {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
             ) : (
               <>
-                <span>Update Password</span>
+                <span>Update password</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </>
             )}
-          </Button>
+          </button>
         </form>
-      </CardContent>
-
-      <CardFooter className="border-border-hairline/60 justify-center border-t pt-3">
-        <Link
-          href="/login"
-          className="flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Back to Sign In</span>
-        </Link>
-      </CardFooter>
-    </Card>
+      </div>
+    </AuthPanel>
   );
 }

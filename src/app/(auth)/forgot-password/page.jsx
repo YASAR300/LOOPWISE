@@ -1,34 +1,34 @@
 "use client";
 
-import * as React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import { Mail, ArrowRight, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import {
-  ArrowRight,
-  Mail,
-  AlertCircle,
-  CheckCircle2,
-  Loader2,
-  ArrowLeft,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+  AuthPanel,
+  FormAlert,
+  StatusScreen,
+  EmailPill,
+  useCooldown,
+} from "@/components/auth";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [submitted, setSubmitted] = React.useState(false);
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+
+  const { remaining, isCoolingDown, startCooldown } = useCooldown(
+    60,
+    "forgot_password"
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!email || !email.includes("@")) {
+      setError("Please enter a valid work email address");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -36,118 +36,157 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim() }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to process request");
-        setLoading(false);
-        return;
-      }
-
+      // We do not reveal account existence for security
       setSubmitted(true);
-      setLoading(false);
+      startCooldown(60);
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      // Still show calm confirmation or generic error
+      setSubmitted(true);
+      startCooldown(60);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (isCoolingDown || loading) return;
+    setLoading(true);
+
+    try {
+      await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      startCooldown(60);
+    } catch {
+      // Calm fallback
+    } finally {
       setLoading(false);
     }
   };
 
   if (submitted) {
     return (
-      <Card raised className="border-border-hairline shadow-2xl">
-        <CardHeader className="pb-4 text-center">
-          <div className="bg-semantic-success/15 mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full text-semantic-success">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <CardTitle className="text-lg">Check your email</CardTitle>
-          <CardDescription>
-            If an account exists for{" "}
-            <span className="font-semibold text-text-primary">{email}</span>,
-            we&apos;ve sent a password reset link.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-center">
-          <p className="text-xs text-text-muted">
-            The link will expire in 60 minutes. Please check your spam folder if
-            you don&apos;t see it within a few minutes.
-          </p>
-        </CardContent>
-        <CardFooter className="border-border-hairline/60 justify-center border-t pt-3">
-          <Link
-            href="/login"
-            className="flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Return to Sign In</span>
-          </Link>
-        </CardFooter>
-      </Card>
+      <AuthPanel>
+        <StatusScreen
+          type="success"
+          title="Check your inbox"
+          description="If an account exists associated with this email, password reset instructions have been sent. Links remain valid for 60 minutes."
+          meta={<EmailPill email={email} onEdit={() => setSubmitted(false)} />}
+          actions={
+            <div className="space-y-3 pt-2">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={isCoolingDown || loading}
+                className="btn-secondary-outline flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line text-xs font-semibold disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+                />
+                <span>
+                  {isCoolingDown
+                    ? `Resend instructions in ${remaining}s`
+                    : "Resend instructions"}
+                </span>
+              </button>
+
+              <Link
+                href="/login"
+                className="btn-primary-indigo flex h-11 w-full items-center justify-center gap-2 rounded-xl text-xs font-semibold"
+              >
+                <span>Return to sign in</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          }
+        />
+      </AuthPanel>
     );
   }
 
   return (
-    <Card raised className="border-border-hairline shadow-2xl">
-      <CardHeader className="pb-4 text-center">
-        <CardTitle className="text-lg">Reset your password</CardTitle>
-        <CardDescription>
-          Enter your email address and we&apos;ll send you a recovery link.
-        </CardDescription>
-      </CardHeader>
+    <AuthPanel>
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <Link
+            href="/login"
+            className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-3 transition-colors hover:text-ink"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to sign in</span>
+          </Link>
+          <h1 className="font-display text-xl font-bold tracking-tight text-ink">
+            Reset your password
+          </h1>
+          <p className="text-xs leading-relaxed text-ink-3">
+            Enter your work email address and we&apos;ll send you instructions
+            to safely reset your account access.
+          </p>
+        </div>
 
-      <CardContent className="space-y-4">
         {error && (
-          <div className="border-semantic-danger/30 bg-semantic-danger/10 flex items-center gap-2 rounded-md border px-3 py-2 text-xs text-semantic-danger">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
+          <FormAlert
+            type="error"
+            message={error}
+            onDismiss={() => setError("")}
+          />
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
+            <label
+              htmlFor="forgot-email"
+              className="block text-xs font-semibold text-ink-2"
+            >
               Work Email
             </label>
-            <Input
+            <input
+              id="forgot-email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              leftIcon={<Mail className="h-4 w-4" />}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError("");
+              }}
+              autoComplete="email"
               required
               disabled={loading}
+              placeholder="alex.carter@enterprise.ai"
+              className="duration-160 focus:outline-hidden h-11 w-full rounded-xl border border-line bg-panel-2 px-3.5 text-xs text-ink transition-all placeholder:text-ink-3 hover:border-line-2 focus:border-transparent focus:ring-2 focus:ring-brand-indigo sm:text-sm"
             />
           </div>
 
-          <Button
+          <button
             type="submit"
-            variant="primary"
-            size="md"
-            className="w-full gap-2"
             disabled={loading}
+            className="btn-primary-indigo shadow-xs active:scale-98 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-transform disabled:opacity-50 sm:text-sm"
           >
             {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
             ) : (
               <>
-                <span>Send Reset Link</span>
+                <span>Send instructions</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </>
             )}
-          </Button>
+          </button>
         </form>
-      </CardContent>
 
-      <CardFooter className="border-border-hairline/60 justify-center border-t pt-3">
-        <Link
-          href="/login"
-          className="flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text-primary"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Back to Sign In</span>
-        </Link>
-      </CardFooter>
-    </Card>
+        <div className="border-t border-line pt-2 text-center text-xs text-ink-3">
+          Remembered your password?{" "}
+          <Link
+            href="/login"
+            className="font-semibold text-brand-indigo hover:underline"
+          >
+            Sign in
+          </Link>
+        </div>
+      </div>
+    </AuthPanel>
   );
 }
