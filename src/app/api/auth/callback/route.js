@@ -8,7 +8,8 @@ import { logSignIn } from "@/lib/audit";
 export async function GET(request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/app";
+  const returnTo = searchParams.get("returnTo") || searchParams.get("next");
+  const intent = searchParams.get("intent");
   const error = searchParams.get("error");
 
   if (error) {
@@ -82,7 +83,22 @@ export async function GET(request) {
         STRATEGIST: "/strategist/dashboard",
         ADMIN: "/admin/dashboard",
       };
-      const redirectTo = next.startsWith("/") ? next : roleHome[role] || "/app";
+
+      let redirectTo = roleHome[role] || "/app";
+      if (
+        returnTo &&
+        returnTo.startsWith("/") &&
+        !returnTo.startsWith("//") &&
+        !returnTo.includes("://")
+      ) {
+        redirectTo = returnTo;
+      }
+
+      if (intent && !redirectTo.includes("intent=")) {
+        const joinChar = redirectTo.includes("?") ? "&" : "?";
+        redirectTo = `${redirectTo}${joinChar}intent=${encodeURIComponent(intent)}`;
+      }
+
       return NextResponse.redirect(`${origin}${redirectTo}`);
     }
   }
