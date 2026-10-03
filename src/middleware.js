@@ -66,7 +66,9 @@ export async function middleware(request) {
 
   // Check protected routes
   for (const route of PROTECTED_ROUTES) {
-    if (pathname.startsWith(route.prefix)) {
+    const isMatched =
+      pathname === route.prefix || pathname.startsWith(route.prefix + "/");
+    if (isMatched) {
       if (!user) {
         const url = new URL("/login", request.url);
         url.searchParams.set("redirect", pathname);

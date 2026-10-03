@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { inter, geistMono } from "./fonts";
+import { bricolage, inter, geistMono } from "./fonts";
 import "./globals.css";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
@@ -24,16 +24,16 @@ export const metadata = {
 
 export default async function RootLayout({ children }) {
   const cookieStore = await cookies();
-  const themeCookie = cookieStore.get("loopwise_theme")?.value || "dark";
-  const initialThemeClass = themeCookie === "light" ? "light" : "dark";
+  const themeCookie = cookieStore.get("loopwise_theme")?.value || "light";
+  const initialThemeClass = themeCookie === "dark" ? "dark" : "light";
 
   return (
     <html
       lang="en"
-      className={`${initialThemeClass} ${inter.variable} ${geistMono.variable}`}
+      className={`${initialThemeClass} ${bricolage.variable} ${inter.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="selection:bg-accent/30 min-h-screen bg-background font-sans text-text-primary antialiased selection:text-white">
+      <body className="min-h-screen bg-canvas font-sans text-ink antialiased selection:bg-brand-accent/20 selection:text-ink">
         <ThemeProvider initialTheme={themeCookie}>
           <ToastProvider>
             <KeyboardShortcutProvider>

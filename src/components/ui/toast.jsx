@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { createContext, useContext, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import {
   X,
   CheckCircle,
@@ -13,6 +19,54 @@ import { cn } from "@/lib/utils";
 
 const ToastContext = createContext(null);
 
+let globalToastHandler = null;
+
+export const toast = Object.assign(
+  (options) => {
+    if (globalToastHandler) {
+      return globalToastHandler(options);
+    }
+  },
+  {
+    success: (title, opts = {}) => {
+      if (globalToastHandler) {
+        return globalToastHandler({
+          title,
+          description: typeof opts === "string" ? opts : opts.description,
+          action: opts.action ? (
+            <button
+              type="button"
+              onClick={opts.action.onClick}
+              className="mt-1 text-left text-xs font-semibold text-brand-indigo hover:underline"
+            >
+              {opts.action.label}
+            </button>
+          ) : undefined,
+          variant: "success",
+        });
+      }
+    },
+    error: (title, opts = {}) => {
+      if (globalToastHandler) {
+        return globalToastHandler({
+          title,
+          description: typeof opts === "string" ? opts : opts.description,
+          variant: "danger",
+        });
+      }
+    },
+    info: (title, opts = {}) => {
+      if (globalToastHandler) {
+        return globalToastHandler({
+          title,
+          description: typeof opts === "string" ? opts : opts.description,
+          variant: "info",
+        });
+      }
+    },
+  }
+);
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
@@ -20,7 +74,7 @@ export function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toast = useCallback(
+  const showToast = useCallback(
     ({
       title,
       description,
@@ -45,50 +99,46 @@ export function ToastProvider({ children }) {
     [removeToast]
   );
 
+  useEffect(() => {
+    globalToastHandler = showToast;
+    return () => {
+      globalToastHandler = null;
+    };
+  }, [showToast]);
+
   return (
-    <ToastContext.Provider value={{ toast, removeToast }}>
+    <ToastContext.Provider value={{ toast: showToast, removeToast }}>
       {children}
       <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
             className={cn(
-              "pointer-events-auto flex animate-fade-in items-start gap-3 rounded-lg border border-border-hairline bg-surface-raised p-3.5 shadow-2xl transition-all duration-fast",
+              "shadow-warm pointer-events-auto flex items-start gap-3 rounded-xl border border-line bg-panel p-3.5 text-xs transition-all",
               t.variant === "success" &&
-                "border-semantic-success/30 bg-surface-raised",
-              t.variant === "danger" &&
-                "border-semantic-danger/30 bg-surface-raised",
+                "border-emerald-300 dark:border-emerald-800",
+              t.variant === "danger" && "border-red-300 dark:border-red-800",
               t.variant === "warning" &&
-                "border-semantic-warning/30 bg-surface-raised"
+                "border-amber-300 dark:border-amber-800"
             )}
           >
-            <div className="mt-0.5 shrink-0">
-              {t.variant === "success" && (
-                <CheckCircle className="h-4 w-4 text-semantic-success" />
-              )}
-              {t.variant === "danger" && (
-                <AlertOctagon className="h-4 w-4 text-semantic-danger" />
-              )}
-              {t.variant === "warning" && (
-                <AlertTriangle className="h-4 w-4 text-semantic-warning" />
-              )}
-              {(!t.variant ||
-                t.variant === "default" ||
-                t.variant === "info") && (
-                <Info className="h-4 w-4 text-accent" />
-              )}
-            </div>
+            {t.variant === "success" && (
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            )}
+            {t.variant === "danger" && (
+              <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+            )}
+            {t.variant === "warning" && (
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            )}
+            {(t.variant === "info" || t.variant === "default") && (
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-indigo" />
+            )}
 
-            <div className="grid flex-1 gap-1">
-              {t.title && (
-                <div className="text-xs font-semibold leading-tight text-text-primary">
-                  {t.title}
-                </div>
-              )}
+            <div className="flex-1">
+              <div className="font-semibold text-ink">{t.title}</div>
               {t.description && (
-                <div className="text-2xs leading-normal text-text-secondary">
-                  {t.description}
-                </div>
+                <div className="mt-0.5 text-ink-2">{t.description}</div>
               )}
               {t.onUndo && (
                 <button
@@ -97,7 +147,7 @@ export function ToastProvider({ children }) {
                     t.onUndo();
                     removeToast(t.id);
                   }}
-                  className="mt-1 text-left text-xs font-medium text-accent hover:underline"
+                  className="mt-1 text-left text-xs font-semibold text-brand-indigo hover:underline"
                 >
                   Undo
                 </button>
@@ -110,7 +160,7 @@ export function ToastProvider({ children }) {
             <button
               type="button"
               onClick={() => removeToast(t.id)}
-              className="shrink-0 p-0.5 text-text-muted hover:text-text-primary"
+              className="shrink-0 p-0.5 text-ink-3 hover:text-ink"
             >
               <X className="h-3.5 w-3.5" />
             </button>

@@ -1,28 +1,33 @@
 "use client";
 
-import * as React from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Kbd } from "@/components/ui/kbd";
+import { ShortcutSheet } from "@/components/ui/shortcut-sheet";
 
-const ShortcutContext = React.createContext({
+const ShortcutContext = createContext({
   openHelp: () => {},
-  registerChord: () => () => {},
 });
 
 export function KeyboardShortcutProvider({ children }) {
   const router = useRouter();
-  const [helpOpen, setHelpOpen] = React.useState(false);
-  const pendingKeyRef = React.useRef(null);
-  const timeoutRef = React.useRef(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const pendingKeyRef = useRef(null);
+  const timeoutRef = useRef(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    const handleOpenShortcut = () => setHelpOpen(true);
+    window.addEventListener("open-shortcut-sheet", handleOpenShortcut);
+    return () =>
+      window.removeEventListener("open-shortcut-sheet", handleOpenShortcut);
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       // Ignore if typing in an input, textarea, or contentEditable
       const target = e.target;
@@ -44,7 +49,22 @@ export function KeyboardShortcutProvider({ children }) {
         return;
       }
 
-      // Chord detection (e.g. G then X)
+      // "C" shortcut to create new
+      if (
+        e.key.toLowerCase() === "c" &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !pendingKeyRef.current
+      ) {
+        e.preventDefault();
+        const createBtn = document.querySelector(
+          "[title*='New brief'], [title*='New proposal'], [title*='New user'], a[href*='/new']"
+        );
+        if (createBtn) createBtn.click();
+        return;
+      }
+
+      // Chord detection (G then X)
       if (
         e.key.toLowerCase() === "g" &&
         !e.metaKey &&
@@ -64,15 +84,24 @@ export function KeyboardShortcutProvider({ children }) {
         pendingKeyRef.current = null;
         clearTimeout(timeoutRef.current);
 
-        if (nextKey === "d") {
+        if (nextKey === "h") {
           e.preventDefault();
-          router.push("/app");
-        } else if (nextKey === "c") {
+          router.push("/client/dashboard");
+        } else if (nextKey === "e") {
           e.preventDefault();
-          router.push("/dev/components");
-        } else if (nextKey === "h") {
+          router.push("/client/engagements");
+        } else if (nextKey === "a") {
           e.preventDefault();
-          router.push("/");
+          router.push("/client/agents");
+        } else if (nextKey === "b") {
+          e.preventDefault();
+          router.push("/client/briefs");
+        } else if (nextKey === "s") {
+          e.preventDefault();
+          router.push("/app/settings");
+        } else if (nextKey === "d") {
+          e.preventDefault();
+          router.push("/dev/design");
         }
       }
     };
@@ -87,75 +116,11 @@ export function KeyboardShortcutProvider({ children }) {
   return (
     <ShortcutContext.Provider value={{ openHelp: () => setHelpOpen(true) }}>
       {children}
-      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Keyboard Shortcuts</DialogTitle>
-            <DialogDescription>
-              Quickly navigate through Loopwise using keyboard shortcuts.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div>
-              <h4 className="mb-2 text-2xs font-semibold uppercase tracking-wider text-text-muted">
-                Global
-              </h4>
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-text-primary">Command Palette</span>
-                  <div className="flex items-center gap-1">
-                    <Kbd>⌘</Kbd>
-                    <Kbd>K</Kbd>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-primary">Shortcuts Help</span>
-                  <Kbd>?</Kbd>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="mb-2 text-2xs font-semibold uppercase tracking-wider text-text-muted">
-                Navigation Chords
-              </h4>
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-text-primary">Go to Dashboard</span>
-                  <div className="flex items-center gap-1">
-                    <Kbd>G</Kbd>
-                    <span className="text-2xs text-text-muted">then</span>
-                    <Kbd>D</Kbd>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-primary">
-                    Go to Component Showcase
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Kbd>G</Kbd>
-                    <span className="text-2xs text-text-muted">then</span>
-                    <Kbd>C</Kbd>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-primary">Go to Home</span>
-                  <div className="flex items-center gap-1">
-                    <Kbd>G</Kbd>
-                    <span className="text-2xs text-text-muted">then</span>
-                    <Kbd>H</Kbd>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ShortcutSheet open={helpOpen} onClose={() => setHelpOpen(false)} />
     </ShortcutContext.Provider>
   );
 }
 
 export function useKeyboardShortcuts() {
-  return React.useContext(ShortcutContext);
+  return useContext(ShortcutContext);
 }

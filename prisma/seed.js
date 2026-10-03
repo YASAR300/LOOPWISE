@@ -942,6 +942,175 @@ async function main() {
   });
 
   console.log(`✅ Seeded demo autonomous agents for ${org1.name}`);
+
+  // 7. SAMPLE ENGAGEMENTS, MILESTONES & REVIEWS
+  const elenaProfile = await prisma.strategistProfile.findFirst({
+    where: { user: { email: "elena.rostova@autonomous.ai" } },
+  });
+  const marcusProfile = await prisma.strategistProfile.findFirst({
+    where: { user: { email: "marcus.chen@agenticlabs.io" } },
+  });
+  const mayaProfile = await prisma.strategistProfile.findFirst({
+    where: { user: { email: "maya.patel@flowai.tech" } },
+  });
+
+  if (elenaProfile && org1) {
+    const eng1 = await prisma.engagement.upsert({
+      where: { id: "demo-eng-elena-acme" },
+      update: {},
+      create: {
+        id: "demo-eng-elena-acme",
+        organizationId: org1.id,
+        strategistProfileId: elenaProfile.id,
+        title: "Enterprise Multi-Agent Invoice & AP Automation",
+        status: "ACTIVE",
+        model: "RETAINER",
+        rate: 16000,
+        startDate: new Date("2026-01-15"),
+      },
+    });
+
+    await prisma.milestone.upsert({
+      where: { id: "demo-ms-elena-1" },
+      update: {},
+      create: {
+        id: "demo-ms-elena-1",
+        engagementId: eng1.id,
+        title: "SOP Workflow Ingestion & Feasibility Matrix",
+        description:
+          "Mapped 14 core Accounts Payable workflows with LangGraph multi-agent topology.",
+        amount: 8000,
+        status: "APPROVED",
+      },
+    });
+
+    await prisma.review.upsert({
+      where: { engagementId: eng1.id },
+      update: {},
+      create: {
+        engagementId: eng1.id,
+        reviewerId: client1User.id,
+        strategistProfileId: elenaProfile.id,
+        rating: 5,
+        feedback:
+          "Elena reduced our invoice validation cycle from 4 days to 18 minutes. The LangGraph swarms operate with zero drift.",
+        isPublic: true,
+      },
+    });
+  }
+
+  if (marcusProfile && org1) {
+    const eng2 = await prisma.engagement.upsert({
+      where: { id: "demo-eng-marcus-acme" },
+      update: {},
+      create: {
+        id: "demo-eng-marcus-acme",
+        organizationId: org1.id,
+        strategistProfileId: marcusProfile.id,
+        title: "Deterministic Guardrails & SOC 2 Telemetry",
+        status: "ACTIVE",
+        model: "HOURLY",
+        rate: 260,
+        startDate: new Date("2026-02-01"),
+      },
+    });
+
+    await prisma.review.upsert({
+      where: { engagementId: eng2.id },
+      update: {},
+      create: {
+        engagementId: eng2.id,
+        reviewerId: client1User.id,
+        strategistProfileId: marcusProfile.id,
+        rating: 5,
+        feedback:
+          "Marcus instituted our model red-teaming harness and PII boundary filters. Enterprise clients signed immediately.",
+        isPublic: true,
+      },
+    });
+  }
+
+  if (mayaProfile && org2) {
+    const eng3 = await prisma.engagement.upsert({
+      where: { id: "demo-eng-maya-apex" },
+      update: {},
+      create: {
+        id: "demo-eng-maya-apex",
+        organizationId: org2.id,
+        strategistProfileId: mayaProfile.id,
+        title: "HIPAA Clinical Prior Authorization Pipeline",
+        status: "COMPLETED",
+        model: "FIXED",
+        rate: 24000,
+        startDate: new Date("2026-01-05"),
+        endDate: new Date("2026-03-01"),
+      },
+    });
+
+    await prisma.review.upsert({
+      where: { engagementId: eng3.id },
+      update: {},
+      create: {
+        engagementId: eng3.id,
+        reviewerId: client2User.id,
+        strategistProfileId: mayaProfile.id,
+        rating: 5,
+        feedback:
+          "Dr. Maya delivered an oncology authorization engine that saved over 12,000 clinician hours in Q1 alone.",
+        isPublic: true,
+      },
+    });
+  }
+
+  // 8. METRIC DEFINITIONS & SNAPSHOTS (HOURS AUTOMATED)
+  const metricDef1 = await prisma.metricDefinition.upsert({
+    where: { id: "metric-hours-automated-org1" },
+    update: {},
+    create: {
+      id: "metric-hours-automated-org1",
+      organizationId: org1.id,
+      name: "Hours of Manual Work Automated",
+      unit: "hours",
+      targetValue: 50000,
+      thresholdCrit: 1000,
+    },
+  });
+
+  const metricDef2 = await prisma.metricDefinition.upsert({
+    where: { id: "metric-hours-automated-org2" },
+    update: {},
+    create: {
+      id: "metric-hours-automated-org2",
+      organizationId: org2.id,
+      name: "Hours of Clinical Work Automated",
+      unit: "hours",
+      targetValue: 20000,
+      thresholdCrit: 500,
+    },
+  });
+
+  await prisma.metricSnapshot.upsert({
+    where: { id: "snapshot-hours-1" },
+    update: { value: 14280 },
+    create: {
+      id: "snapshot-hours-1",
+      metricDefinitionId: metricDef1.id,
+      agentId: agent1.id,
+      value: 14280,
+    },
+  });
+
+  await prisma.metricSnapshot.upsert({
+    where: { id: "snapshot-hours-2" },
+    update: { value: 18450 },
+    create: {
+      id: "snapshot-hours-2",
+      metricDefinitionId: metricDef2.id,
+      value: 18450,
+    },
+  });
+
+  console.log(`✅ Seeded demo engagements, milestones, and metric snapshots`);
   console.log("✨ Seed completed successfully!");
 }
 

@@ -1,38 +1,46 @@
 "use client";
 
-import * as React from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import {
   Search,
   Home,
-  LayoutDashboard,
-  Palette,
-  LogIn,
+  Briefcase,
+  Bot,
+  FileText,
+  CreditCard,
+  Settings,
+  Sparkles,
+  Users,
+  Compass,
   Moon,
   Sun,
-  Laptop,
+  Layers,
   HelpCircle,
 } from "lucide-react";
-import { useTheme } from "./theme-provider";
-import { useKeyboardShortcuts } from "./keyboard-shortcuts";
+import { useTheme } from "@/components/layout/theme-provider";
 import { Kbd } from "@/components/ui/kbd";
 
-const CommandContext = React.createContext({
+const CommandContext = createContext({
   open: false,
   setOpen: () => {},
   registerCommands: () => () => {},
 });
 
 export function CommandPaletteProvider({ children }) {
-  const [open, setOpen] = React.useState(false);
-  const [customCommands, setCustomCommands] = React.useState([]);
+  const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { setTheme } = useTheme();
-  const { openHelp } = useKeyboardShortcuts();
+  const { theme, setTheme } = useTheme();
 
-  // Global Cmd+K / Ctrl+K listener
-  React.useEffect(() => {
+  // Global Cmd+K / Ctrl+K listener and custom event listener
+  useEffect(() => {
     const down = (e) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -40,160 +48,168 @@ export function CommandPaletteProvider({ children }) {
       }
     };
 
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
-  }, []);
+    const handleCustomOpen = () => setOpen(true);
 
-  const registerCommands = React.useCallback((cmds) => {
-    setCustomCommands((prev) => [...prev, ...cmds]);
+    document.addEventListener("keydown", down);
+    window.addEventListener("open-command-palette", handleCustomOpen);
     return () => {
-      setCustomCommands((prev) =>
-        prev.filter((c) => !cmds.some((nc) => nc.id === c.id))
-      );
+      document.removeEventListener("keydown", down);
+      window.removeEventListener("open-command-palette", handleCustomOpen);
     };
   }, []);
 
-  const runCommand = (commandAction) => {
+  const runCommand = (action) => {
     setOpen(false);
-    commandAction();
+    action();
   };
 
   return (
-    <CommandContext.Provider value={{ open, setOpen, registerCommands }}>
+    <CommandContext.Provider
+      value={{ open, setOpen, registerCommands: () => () => {} }}
+    >
       {children}
       {open && (
-        <div className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center bg-black/70 p-4 pt-20 backdrop-blur-sm">
+        <div className="bg-ink/40 backdrop-blur-xs animate-in fade-in fixed inset-0 z-50 flex items-start justify-center p-4 pt-20 dark:bg-black/75">
           <div className="fixed inset-0" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-xl overflow-hidden rounded-lg border border-border-hairline bg-surface-raised shadow-2xl">
-            <Command className="w-full bg-transparent text-text-primary" loop>
-              <div className="flex items-center border-b border-border-hairline px-3 py-2">
-                <Search className="mr-2 h-4 w-4 shrink-0 text-text-muted" />
+          <div className="shadow-warm relative w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-panel text-ink">
+            <Command className="w-full bg-transparent text-ink" loop>
+              <div className="flex items-center border-b border-line px-3.5 py-3">
+                <Search className="mr-2.5 h-4 w-4 shrink-0 text-ink-3" />
                 <Command.Input
-                  placeholder="Type a command or search..."
-                  className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+                  placeholder="Type a command or jump to screen..."
+                  className="w-full bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none"
                   autoFocus
                 />
-                <Kbd>ESC</Kbd>
+                <kbd className="rounded border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-2xs text-ink-3">
+                  ESC
+                </kbd>
               </div>
 
               <Command.List className="max-h-80 overflow-y-auto p-2">
-                <Command.Empty className="py-6 text-center text-xs text-text-muted">
+                <Command.Empty className="py-6 text-center text-xs text-ink-3">
                   No matching results found.
                 </Command.Empty>
 
-                {/* Built-in Navigation Group */}
+                {/* Primary Navigation */}
                 <Command.Group
                   heading="Navigation"
-                  className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-text-muted"
+                  className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-ink-3"
                 >
                   <Command.Item
-                    onSelect={() => runCommand(() => router.push("/"))}
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
+                    onSelect={() =>
+                      runCommand(() => router.push("/client/dashboard"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
                   >
-                    <Home className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>Home & Overview</span>
-                    <span className="ml-auto text-2xs text-text-muted">
+                    <Home className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
+                    <span>Client Dashboard</span>
+                    <span className="ml-auto font-mono text-[10px] text-ink-3">
                       G then H
                     </span>
                   </Command.Item>
 
                   <Command.Item
-                    onSelect={() => runCommand(() => router.push("/app"))}
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
+                    onSelect={() =>
+                      runCommand(() => router.push("/client/engagements"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
                   >
-                    <LayoutDashboard className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>App Shell / Dashboard</span>
-                    <span className="ml-auto text-2xs text-text-muted">
-                      G then D
+                    <Briefcase className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
+                    <span>Active Engagements</span>
+                    <span className="ml-auto font-mono text-[10px] text-ink-3">
+                      G then E
                     </span>
                   </Command.Item>
 
                   <Command.Item
                     onSelect={() =>
-                      runCommand(() => router.push("/dev/components"))
+                      runCommand(() => router.push("/client/agents"))
                     }
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
                   >
-                    <Palette className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>UI Design System Showcase</span>
-                    <span className="ml-auto text-2xs text-text-muted">
-                      G then C
+                    <Bot className="mr-2.5 h-3.5 w-3.5 text-brand-accent" />
+                    <span>Autonomous Agents Fleet</span>
+                    <span className="ml-auto font-mono text-[10px] text-ink-3">
+                      G then A
                     </span>
                   </Command.Item>
 
                   <Command.Item
-                    onSelect={() => runCommand(() => router.push("/login"))}
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
+                    onSelect={() =>
+                      runCommand(() => router.push("/client/briefs"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
                   >
-                    <LogIn className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>Login & Authentication</span>
+                    <FileText className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
+                    <span>Workflow Briefs</span>
+                    <span className="ml-auto font-mono text-[10px] text-ink-3">
+                      G then B
+                    </span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
+                      runCommand(() => router.push("/strategists"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Compass className="mr-2.5 h-3.5 w-3.5 text-forest" />
+                    <span>Browse AI Leaders Directory</span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() => runCommand(() => router.push("/app/roi"))}
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Sparkles className="mr-2.5 h-3.5 w-3.5 text-tile-coral" />
+                    <span>ROI Telemetry & Compliance</span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
+                      runCommand(() => router.push("/app/billing"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <CreditCard className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
+                    <span>Billing & Escrow Ledgers</span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
+                      runCommand(() => router.push("/app/settings"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Settings className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
+                    <span>Settings & Preferences</span>
+                    <span className="ml-auto font-mono text-[10px] text-ink-3">
+                      G then S
+                    </span>
                   </Command.Item>
                 </Command.Group>
 
                 {/* Theme Options */}
                 <Command.Group
-                  heading="Preferences & Theme"
-                  className="mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-text-muted"
+                  heading="Appearance"
+                  className="mt-2 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-ink-3"
                 >
                   <Command.Item
-                    onSelect={() => runCommand(() => setTheme("dark"))}
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
-                  >
-                    <Moon className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>Set Theme to Dark</span>
-                  </Command.Item>
-
-                  <Command.Item
                     onSelect={() => runCommand(() => setTheme("light"))}
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
                   >
-                    <Sun className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>Set Theme to Light</span>
+                    <Sun className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
+                    <span>Switch to Warm Light Theme</span>
                   </Command.Item>
 
                   <Command.Item
-                    onSelect={() => runCommand(() => setTheme("system"))}
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
+                    onSelect={() => runCommand(() => setTheme("dark"))}
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
                   >
-                    <Laptop className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>Set Theme to System Default</span>
-                  </Command.Item>
-
-                  <Command.Item
-                    onSelect={() => runCommand(() => openHelp())}
-                    className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
-                  >
-                    <HelpCircle className="mr-2 h-3.5 w-3.5 text-text-muted" />
-                    <span>Show Keyboard Shortcuts Sheet</span>
-                    <span className="ml-auto text-2xs text-text-muted">?</span>
+                    <Moon className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
+                    <span>Switch to Warm Dark Theme</span>
                   </Command.Item>
                 </Command.Group>
-
-                {/* Dynamically Registered Commands from Later Prompts */}
-                {customCommands.length > 0 && (
-                  <Command.Group
-                    heading="Actions"
-                    className="mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-text-muted"
-                  >
-                    {customCommands.map((cmd) => (
-                      <Command.Item
-                        key={cmd.id}
-                        onSelect={() => runCommand(cmd.action)}
-                        className="flex cursor-pointer items-center rounded px-2 py-1.5 text-xs text-text-primary aria-selected:bg-surface-highlight aria-selected:text-accent"
-                      >
-                        {cmd.icon && (
-                          <span className="mr-2 shrink-0">{cmd.icon}</span>
-                        )}
-                        <span>{cmd.label}</span>
-                        {cmd.shortcut && (
-                          <span className="ml-auto text-2xs text-text-muted">
-                            {cmd.shortcut}
-                          </span>
-                        )}
-                      </Command.Item>
-                    ))}
-                  </Command.Group>
-                )}
               </Command.List>
             </Command>
           </div>
@@ -204,5 +220,5 @@ export function CommandPaletteProvider({ children }) {
 }
 
 export function useCommandPalette() {
-  return React.useContext(CommandContext);
+  return useContext(CommandContext);
 }

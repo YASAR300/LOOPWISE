@@ -11,23 +11,13 @@ import {
   AlertCircle,
   Loader2,
   Shield,
+  Save,
+  RotateCcw,
 } from "lucide-react";
-import { PageHeader, ContentContainer } from "@/components/layout/page-header";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Avatar } from "@/components/ui/avatar";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/toast";
 
 export function SettingsView({ initialUser }) {
+  const [activeTab, setActiveTab] = React.useState("profile");
   const [user, setUser] = React.useState(
     initialUser || {
       name: "Alex Carter",
@@ -41,14 +31,16 @@ export function SettingsView({ initialUser }) {
   const [name, setName] = React.useState(user?.name || "");
   const [avatarUrl, setAvatarUrl] = React.useState(user?.image || "");
   const [profileSaving, setProfileSaving] = React.useState(false);
-  const [profileMessage, setProfileMessage] = React.useState(null);
   const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
+
+  // Dirty check for Profile
+  const isProfileDirty =
+    name !== (user?.name || "") || avatarUrl !== (user?.image || "");
 
   // Password Form State
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [passwordSaving, setPasswordSaving] = React.useState(false);
-  const [passwordMessage, setPasswordMessage] = React.useState(null);
 
   // Notifications State
   const [notifs, setNotifs] = React.useState({
@@ -58,12 +50,15 @@ export function SettingsView({ initialUser }) {
     inAppEngagements: true,
     inAppMessages: true,
   });
+  const [initialNotifs, setInitialNotifs] = React.useState({ ...notifs });
   const [notifsSaving, setNotifsSaving] = React.useState(false);
+
+  const isNotifsDirty =
+    JSON.stringify(notifs) !== JSON.stringify(initialNotifs);
 
   // Danger Zone State
   const [deleteConfirm, setDeleteConfirm] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
-  const [deleteError, setDeleteError] = React.useState("");
 
   // Fetch initial preferences
   React.useEffect(() => {
@@ -71,13 +66,15 @@ export function SettingsView({ initialUser }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.preferences) {
-          setNotifs({
+          const pref = {
             emailTransactional: data.preferences.emailTransactional ?? true,
             emailSecurity: data.preferences.emailSecurity ?? true,
             emailMarketing: data.preferences.emailMarketing ?? false,
             inAppEngagements: data.preferences.inAppEngagements ?? true,
             inAppMessages: data.preferences.inAppMessages ?? true,
-          });
+          };
+          setNotifs(pref);
+          setInitialNotifs(pref);
         }
       })
       .catch(() => null);
@@ -89,8 +86,6 @@ export function SettingsView({ initialUser }) {
     if (!file) return;
 
     setUploadingAvatar(true);
-    setProfileMessage(null);
-
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", "avatars");
@@ -102,19 +97,13 @@ export function SettingsView({ initialUser }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setProfileMessage({
-          type: "error",
-          text: data.error || "Upload failed",
-        });
+        toast.error(data.error || "Upload failed");
       } else {
         setAvatarUrl(data.url);
-        setProfileMessage({
-          type: "success",
-          text: "Avatar uploaded. Click Save to apply.",
-        });
+        toast.success("Avatar uploaded. Save to apply.");
       }
     } catch {
-      setProfileMessage({ type: "error", text: "Avatar upload failed." });
+      toast.error("Avatar upload failed.");
     } finally {
       setUploadingAvatar(false);
     }
@@ -122,9 +111,12 @@ export function SettingsView({ initialUser }) {
 
   // Save profile
   const handleSaveProfile = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Name cannot be empty");
+      return;
+    }
     setProfileSaving(true);
-    setProfileMessage(null);
 
     try {
       const res = await fetch("/api/settings/profile", {
@@ -134,75 +126,75 @@ export function SettingsView({ initialUser }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setProfileMessage({
-          type: "error",
-          text: data.error || "Failed to update profile",
-        });
+        toast.error(data.error || "Failed to update profile");
       } else {
-        setProfileMessage({
-          type: "success",
-          text: "Profile updated successfully.",
-        });
+        toast.success("Profile saved successfully.");
         setUser((prev) => ({ ...prev, name, image: avatarUrl }));
       }
     } catch {
-      setProfileMessage({ type: "error", text: "Failed to update profile." });
+      toast.error("Failed to update profile.");
     } finally {
       setProfileSaving(false);
     }
   };
 
-  // Save password
+  const handleDiscardProfile = () => {
+    setName(user?.name || "");
+    setAvatarUrl(user?.image || "");
+  };
+
+  // Change password
   const handleSavePassword = async (e) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      setPasswordMessage({ type: "error", text: "Passwords do not match." });
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
       return;
     }
-    setPasswordSaving(true);
-    setPasswordMessage(null);
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
 
+    setPasswordSaving(true);
     try {
       const res = await fetch("/api/settings/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, confirmPassword }),
+        body: JSON.stringify({ password }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setPasswordMessage({
-          type: "error",
-          text: data.error || "Failed to change password",
-        });
+        toast.error(data.error || "Failed to update password");
       } else {
-        setPasswordMessage({
-          type: "success",
-          text: "Password changed successfully.",
-        });
+        toast.success("Password updated successfully.");
         setPassword("");
         setConfirmPassword("");
       }
     } catch {
-      setPasswordMessage({ type: "error", text: "Failed to change password." });
+      toast.error("Failed to update password.");
     } finally {
       setPasswordSaving(false);
     }
   };
 
-  // Toggle notification preference
-  const handleToggleNotif = async (key, value) => {
-    const updated = { ...notifs, [key]: value };
-    setNotifs(updated);
+  // Save notifications
+  const handleSaveNotifs = async () => {
     setNotifsSaving(true);
-
     try {
-      await fetch("/api/settings/notifications", {
+      const res = await fetch("/api/settings/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [key]: value }),
+        body: JSON.stringify({ preferences: notifs }),
       });
-    } catch (err) {
-      console.error("Failed to update notification pref:", err);
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to save notifications");
+      } else {
+        toast.success("Notification preferences saved.");
+        setInitialNotifs({ ...notifs });
+      }
+    } catch {
+      toast.error("Failed to save notifications.");
     } finally {
       setNotifsSaving(false);
     }
@@ -211,105 +203,106 @@ export function SettingsView({ initialUser }) {
   // Delete account
   const handleDeleteAccount = async () => {
     if (deleteConfirm !== "DELETE") {
-      setDeleteError("Please type DELETE to confirm");
+      toast.error("Type DELETE to confirm");
       return;
     }
     setDeleting(true);
-    setDeleteError("");
-
     try {
       const res = await fetch("/api/settings/delete-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmation: deleteConfirm }),
+        method: "DELETE",
       });
       if (res.ok) {
         window.location.href = "/login";
       } else {
-        const data = await res.json();
-        setDeleteError(data.error || "Failed to delete account");
-        setDeleting(false);
+        toast.error("Failed to delete account");
       }
     } catch {
-      setDeleteError("An unexpected error occurred");
+      toast.error("An error occurred during account deletion.");
+    } finally {
       setDeleting(false);
     }
   };
 
+  const navItems = [
+    { id: "profile", label: "Profile", icon: User },
+    { id: "security", label: "Security & Password", icon: Lock },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "danger", label: "Danger Zone", icon: Trash2 },
+  ];
+
   return (
-    <ContentContainer size="default">
-      <PageHeader
-        title="Account Settings"
-        description="Manage your identity, authentication credentials, and notification preferences."
-        badge={<Badge variant="outline">{user?.role || "USER"}</Badge>}
-      />
+    <div className="mx-auto max-w-5xl space-y-6 pb-24">
+      {/* Header */}
+      <div className="border-b border-line pb-4">
+        <h1 className="text-xl font-bold tracking-tight text-ink">
+          Account Settings
+        </h1>
+        <p className="text-xs text-ink-3">
+          Manage your personal identity, credentials, and notification
+          frequencies.
+        </p>
+      </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="border border-border-hairline bg-surface-raised p-1">
-          <TabsTrigger value="profile" className="gap-2 text-xs">
-            <User className="h-3.5 w-3.5" />
-            <span>Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2 text-xs">
-            <Lock className="h-3.5 w-3.5" />
-            <span>Security</span>
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2 text-xs">
-            <Bell className="h-3.5 w-3.5" />
-            <span>Notifications</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="danger"
-            className="gap-2 text-xs text-semantic-danger"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>Danger Zone</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Two Column Layout: Left Sub-Nav + Right Form Area (520-640px) */}
+      <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-12">
+        {/* Left Sub-Nav */}
+        <aside className="space-y-1 md:col-span-4 lg:col-span-3">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                  isActive
+                    ? "shadow-2xs border border-line bg-panel text-ink"
+                    : "text-ink-2 hover:bg-panel-2 hover:text-ink"
+                }`}
+              >
+                <Icon
+                  className={`h-4 w-4 ${isActive ? "text-brand-indigo" : "text-ink-3"}`}
+                />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </aside>
 
-        {/* PROFILE TAB */}
-        <TabsContent value="profile">
-          <Card raised className="border-border-hairline">
-            <CardHeader className="border-b border-border-hairline pb-4">
-              <CardTitle className="text-base">Profile Information</CardTitle>
-              <CardDescription>
-                Update your public name and workspace avatar.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 p-6">
-              {profileMessage && (
-                <div
-                  className={`flex items-center gap-2 rounded-md p-3 text-xs ${
-                    profileMessage.type === "success"
-                      ? "border-semantic-success/30 bg-semantic-success/10 border text-semantic-success"
-                      : "border-semantic-danger/30 bg-semantic-danger/10 border text-semantic-danger"
-                  }`}
-                >
-                  {profileMessage.type === "success" ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                  )}
-                  <span>{profileMessage.text}</span>
-                </div>
-              )}
+        {/* Right Form Container (Constrained 520-640px) */}
+        <div className="max-w-[620px] md:col-span-8 lg:col-span-9">
+          {/* PROFILE TAB */}
+          {activeTab === "profile" && (
+            <div className="shadow-2xs space-y-6 rounded-[14px] border border-line bg-panel p-6">
+              <div>
+                <h2 className="text-sm font-bold tracking-tight text-ink">
+                  Profile Details
+                </h2>
+                <p className="text-xs text-ink-3">
+                  Your public name and avatar visible to collaborators.
+                </p>
+              </div>
 
               {/* Avatar Uploader */}
-              <div className="flex items-center gap-4">
-                <Avatar
-                  src={avatarUrl}
-                  fallback={(name || "U").slice(0, 2).toUpperCase()}
-                  size="lg"
-                  className="h-16 w-16"
-                />
-                <div className="space-y-1.5">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border-hairline bg-surface-raised px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-highlight">
-                    {uploadingAvatar ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="h-3.5 w-3.5" />
-                    )}
-                    <span>Upload New Photo</span>
+              <div className="flex items-center gap-4 pt-2">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-panel-2 text-sm font-bold text-brand-indigo">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt="Avatar"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    name.charAt(0).toUpperCase() || "U"
+                  )}
+                </div>
+                <div>
+                  <label className="btn-secondary-outline inline-flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-xs font-semibold">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>
+                      {uploadingAvatar ? "Uploading..." : "Change avatar"}
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
@@ -318,303 +311,247 @@ export function SettingsView({ initialUser }) {
                       className="hidden"
                     />
                   </label>
-                  <p className="text-2xs text-text-muted">
-                    JPEG, PNG, or WebP. Maximum 5MB.
+                  <p className="mt-1 text-[11px] text-ink-3">
+                    PNG, JPG or WebP up to 4MB.
                   </p>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveProfile} className="max-w-md space-y-4">
+              {/* Name Field */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="focus:outline-hidden w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs text-ink focus:ring-2 focus:ring-brand-indigo"
+                  placeholder="e.g. Alex Carter"
+                />
+              </div>
+
+              {/* Email (Readonly) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-ink">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={user?.email || ""}
+                  disabled
+                  className="w-full cursor-not-allowed rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-ink-3"
+                />
+                <p className="text-[11px] text-ink-3">
+                  To change your primary email, contact customer support.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* SECURITY TAB */}
+          {activeTab === "security" && (
+            <div className="shadow-2xs space-y-6 rounded-[14px] border border-line bg-panel p-6">
+              <div>
+                <h2 className="text-sm font-bold tracking-tight text-ink">
+                  Security & Credentials
+                </h2>
+                <p className="text-xs text-ink-3">
+                  Update your password to keep your account safe.
+                </p>
+              </div>
+
+              <form onSubmit={handleSavePassword} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-                    Email Address
-                  </label>
-                  <Input
-                    type="email"
-                    value={user?.email || ""}
-                    disabled
-                    className="bg-surface-base/50 cursor-not-allowed text-text-muted"
-                  />
-                  <span className="text-2xs text-text-muted">
-                    Email cannot be changed directly. Contact support for
-                    assistance.
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
-                    Full Name
-                  </label>
-                  <Input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    required
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  disabled={profileSaving}
-                  className="gap-2"
-                >
-                  {profileSaving && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                  <span>Save Profile</span>
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* SECURITY TAB */}
-        <TabsContent value="security">
-          <Card raised className="border-border-hairline">
-            <CardHeader className="border-b border-border-hairline pb-4">
-              <CardTitle className="text-base">Change Password</CardTitle>
-              <CardDescription>
-                Ensure your account uses a secure password of at least 8
-                characters.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 p-6">
-              {passwordMessage && (
-                <div
-                  className={`flex items-center gap-2 rounded-md p-3 text-xs ${
-                    passwordMessage.type === "success"
-                      ? "border-semantic-success/30 bg-semantic-success/10 border text-semantic-success"
-                      : "border-semantic-danger/30 bg-semantic-danger/10 border text-semantic-danger"
-                  }`}
-                >
-                  {passwordMessage.type === "success" ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                  )}
-                  <span>{passwordMessage.text}</span>
-                </div>
-              )}
-
-              <form
-                onSubmit={handleSavePassword}
-                className="max-w-md space-y-4"
-              >
-                <div className="space-y-1.5">
-                  <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
+                  <label className="block text-xs font-semibold text-ink">
                     New Password
                   </label>
-                  <Input
+                  <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={8}
+                    placeholder="Minimum 8 characters"
+                    className="w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs text-ink focus:ring-2 focus:ring-brand-indigo"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-2xs font-medium uppercase tracking-wider text-text-muted">
+                  <label className="block text-xs font-semibold text-ink">
                     Confirm New Password
                   </label>
-                  <Input
+                  <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={8}
+                    placeholder="Re-enter password"
+                    className="w-full rounded-lg border border-line bg-panel-2 px-3 py-2 text-xs text-ink focus:ring-2 focus:ring-brand-indigo"
                   />
                 </div>
 
-                <Button
+                <button
                   type="submit"
-                  variant="primary"
-                  size="md"
-                  disabled={passwordSaving}
-                  className="gap-2"
+                  disabled={passwordSaving || !password}
+                  className="btn-primary-indigo flex items-center gap-1.5 px-4 py-2 text-xs font-semibold disabled:opacity-40"
                 >
                   {passwordSaving && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   )}
                   <span>Update Password</span>
-                </Button>
+                </button>
               </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          )}
 
-        {/* NOTIFICATIONS TAB */}
-        <TabsContent value="notifications">
-          <Card raised className="border-border-hairline">
-            <CardHeader className="border-b border-border-hairline pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">
-                    Notification Preferences
-                  </CardTitle>
-                  <CardDescription>
-                    Configure email digests, security notifications, and in-app
-                    updates.
-                  </CardDescription>
-                </div>
-                {notifsSaving && (
-                  <Badge variant="outline" size="xs" className="gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Saving
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="divide-y divide-border-hairline p-0">
-              <div className="flex items-center justify-between p-4">
-                <div>
-                  <div className="text-xs font-semibold text-text-primary">
-                    Transactional Emails
-                  </div>
-                  <div className="text-2xs text-text-muted">
-                    Contract signings, milestone approvals, and invoice
-                    receipts.
-                  </div>
-                </div>
-                <Switch
-                  checked={notifs.emailTransactional}
-                  onCheckedChange={(val) =>
-                    handleToggleNotif("emailTransactional", val)
-                  }
-                />
+          {/* NOTIFICATIONS TAB */}
+          {activeTab === "notifications" && (
+            <div className="shadow-2xs space-y-6 rounded-[14px] border border-line bg-panel p-6">
+              <div>
+                <h2 className="text-sm font-bold tracking-tight text-ink">
+                  Notification Channels
+                </h2>
+                <p className="text-xs text-ink-3">
+                  Choose when and how Loopwise alerts you.
+                </p>
               </div>
 
-              <div className="flex items-center justify-between p-4">
-                <div>
-                  <div className="text-xs font-semibold text-text-primary">
-                    Security & Auth Alerts
+              <div className="space-y-4 divide-y divide-line">
+                <div className="flex items-center justify-between pt-3">
+                  <div>
+                    <div className="text-xs font-semibold text-ink">
+                      Transactional Alerts
+                    </div>
+                    <div className="text-[11px] text-ink-3">
+                      Escrow releases, contract milestone approvals
+                    </div>
                   </div>
-                  <div className="text-2xs text-text-muted">
-                    New device logins, password resets, and session alerts.
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notifs.emailTransactional}
+                    onChange={(e) =>
+                      setNotifs({
+                        ...notifs,
+                        emailTransactional: e.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 rounded border-line text-brand-indigo accent-[#4B3FD6]"
+                  />
                 </div>
-                <Switch
-                  checked={notifs.emailSecurity}
-                  onCheckedChange={(val) =>
-                    handleToggleNotif("emailSecurity", val)
-                  }
-                />
+
+                <div className="flex items-center justify-between pt-3">
+                  <div>
+                    <div className="text-xs font-semibold text-ink">
+                      Security Alerts
+                    </div>
+                    <div className="text-[11px] text-ink-3">
+                      New logins, API key changes, token renewals
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notifs.emailSecurity}
+                    onChange={(e) =>
+                      setNotifs({ ...notifs, emailSecurity: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-line text-brand-indigo accent-[#4B3FD6]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-3">
+                  <div>
+                    <div className="text-xs font-semibold text-ink">
+                      In-App Chat Messages
+                    </div>
+                    <div className="text-[11px] text-ink-3">
+                      Immediate ping when client or strategist posts
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notifs.inAppMessages}
+                    onChange={(e) =>
+                      setNotifs({ ...notifs, inAppMessages: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-line text-brand-indigo accent-[#4B3FD6]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DANGER ZONE TAB */}
+          {activeTab === "danger" && (
+            <div className="shadow-2xs space-y-6 rounded-[14px] border border-red-200 bg-panel p-6 dark:border-red-900/40">
+              <div>
+                <h2 className="text-sm font-bold tracking-tight text-red-600 dark:text-red-400">
+                  Danger Zone
+                </h2>
+                <p className="text-xs text-ink-3">
+                  Permanently delete your account and decommission your agents.
+                </p>
               </div>
 
-              <div className="flex items-center justify-between p-4">
-                <div>
-                  <div className="text-xs font-semibold text-text-primary">
-                    In-App Engagement Updates
-                  </div>
-                  <div className="text-2xs text-text-muted">
-                    Live updates when agent deliverables and proposals are
-                    ready.
-                  </div>
-                </div>
-                <Switch
-                  checked={notifs.inAppEngagements}
-                  onCheckedChange={(val) =>
-                    handleToggleNotif("inAppEngagements", val)
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4">
-                <div>
-                  <div className="text-xs font-semibold text-text-primary">
-                    Direct Messages
-                  </div>
-                  <div className="text-2xs text-text-muted">
-                    Instant alerts when strategists or clients ping you in
-                    active threads.
-                  </div>
-                </div>
-                <Switch
-                  checked={notifs.inAppMessages}
-                  onCheckedChange={(val) =>
-                    handleToggleNotif("inAppMessages", val)
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4">
-                <div>
-                  <div className="text-xs font-semibold text-text-primary">
-                    Marketing & Intelligence Digests
-                  </div>
-                  <div className="text-2xs text-text-muted">
-                    Bi-weekly benchmarks on autonomous agent ROI and marketplace
-                    trends.
-                  </div>
-                </div>
-                <Switch
-                  checked={notifs.emailMarketing}
-                  onCheckedChange={(val) =>
-                    handleToggleNotif("emailMarketing", val)
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* DANGER ZONE TAB */}
-        <TabsContent value="danger">
-          <Card raised className="border-semantic-danger/30">
-            <CardHeader className="border-semantic-danger/20 border-b pb-4">
-              <CardTitle className="text-base text-semantic-danger">
-                Delete Account
-              </CardTitle>
-              <CardDescription>
-                Permanently delete your account, contracts, and all associated
-                organization data.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 p-6">
-              {deleteError && (
-                <div className="border-semantic-danger/30 bg-semantic-danger/10 flex items-center gap-2 rounded-md border p-3 text-xs text-semantic-danger">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{deleteError}</span>
-                </div>
-              )}
-
-              <p className="text-xs text-text-secondary">
-                This action is non-reversible. Please type{" "}
-                <span className="font-mono font-bold text-semantic-danger">
-                  DELETE
-                </span>{" "}
-                to confirm.
-              </p>
-
-              <div className="max-w-md space-y-3">
-                <Input
+              <div className="space-y-3">
+                <p className="text-xs text-ink-2">
+                  To confirm deletion, type <strong>DELETE</strong> in the box
+                  below:
+                </p>
+                <input
                   type="text"
                   value={deleteConfirm}
                   onChange={(e) => setDeleteConfirm(e.target.value)}
                   placeholder="DELETE"
-                  className="border-semantic-danger/40 focus:border-semantic-danger"
+                  className="w-full rounded-lg border border-red-300 bg-panel-2 px-3 py-2 font-mono text-xs text-ink focus:ring-2 focus:ring-red-500 dark:border-red-900/60"
                 />
-
-                <Button
+                <button
                   type="button"
-                  variant="danger"
-                  size="md"
                   onClick={handleDeleteAccount}
-                  disabled={deleting || deleteConfirm !== "DELETE"}
-                  className="gap-2"
+                  disabled={deleteConfirm !== "DELETE" || deleting}
+                  className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-40"
                 >
-                  {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  <span>Permanently Delete My Account</span>
-                </Button>
+                  {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>Permanently Delete Account</span>
+                </button>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </ContentContainer>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* STICKY SAVE BAR ON DIRTY */}
+      {(isProfileDirty || isNotifsDirty) && (
+        <div className="shadow-warm animate-in fade-in slide-in-from-bottom-3 fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-2xl border border-line-2 bg-[#1B1A17] px-5 py-3 text-white duration-150 dark:bg-[#1C1A16]">
+          <span className="text-xs font-semibold">
+            You have unsaved changes
+          </span>
+          <div className="h-4 w-px bg-white/20" />
+          <button
+            type="button"
+            onClick={
+              activeTab === "profile"
+                ? handleDiscardProfile
+                : () => setNotifs({ ...initialNotifs })
+            }
+            className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-3 transition-colors hover:text-white"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Discard</span>
+          </button>
+          <button
+            type="button"
+            onClick={
+              activeTab === "profile" ? handleSaveProfile : handleSaveNotifs
+            }
+            disabled={profileSaving || notifsSaving}
+            className="shadow-xs flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-indigo px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-brand-indigo-hover"
+          >
+            {(profileSaving || notifsSaving) && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            )}
+            <Save className="h-3.5 w-3.5" />
+            <span>Save changes</span>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

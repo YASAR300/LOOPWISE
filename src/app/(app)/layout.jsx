@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { MobileNav } from "@/components/layout/mobile-nav";
+import { CommandPaletteProvider } from "@/components/layout/command-palette";
+import { KeyboardShortcutProvider } from "@/components/layout/keyboard-shortcuts";
+import { FloatingHelpButton } from "@/components/ui/floating-help-button";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function AppLayout({ children }) {
@@ -32,18 +36,37 @@ export default async function AppLayout({ children }) {
           },
         })),
       }
-    : null;
+    : {
+        id: "demo-client",
+        name: "Enterprise Sponsor",
+        email: "sponsor@enterprise.com",
+        role: "CLIENT",
+      };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar (Desktop 240px -> 56px rail) */}
-      <Sidebar initialCollapsed={collapsed} currentUser={serializedUser} />
+    <CommandPaletteProvider>
+      <KeyboardShortcutProvider>
+        <div className="bg-app flex h-screen w-full overflow-hidden text-ink">
+          {/* Sidebar (Desktop 240px -> 56px icon rail) */}
+          <Sidebar initialCollapsed={collapsed} currentUser={serializedUser} />
 
-      {/* Main App Content Area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar currentUser={serializedUser} />
-        <main className="flex-1 overflow-y-auto">{children}</main>
-      </div>
-    </div>
+          {/* Main App Content Area with floating panel feel */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <Topbar currentUser={serializedUser} />
+
+            {/* Scrollable canvas containing floating white panels */}
+            <main className="bg-app flex-1 overflow-y-auto p-4 pb-20 sm:p-6 md:pb-8 lg:p-8">
+              <div className="mx-auto max-w-7xl">{children}</div>
+            </main>
+
+            {/* Mobile Bottom Navigation */}
+            <MobileNav currentUser={serializedUser} />
+
+            {/* Floating Priority Support Chat Bubble */}
+            <FloatingHelpButton />
+          </div>
+        </div>
+      </KeyboardShortcutProvider>
+    </CommandPaletteProvider>
   );
 }

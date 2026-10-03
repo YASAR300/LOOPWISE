@@ -179,6 +179,8 @@ model User {
   referralsMade         Referral[]             @relation("ReferralsMade")
   briefsCreated         Brief[]                @relation("BriefCreator")
   templatePurchases     TemplatePurchase[]
+  savedSearches         SavedSearch[]
+  savedStrategists      SavedStrategist[]
 
   @@index([email])
   @@index([role])
@@ -345,6 +347,7 @@ model StrategistProfile {
   shortlistItems          ShortlistItem[]
   meetingRequests         MeetingRequest[]
   reports                 Report[]
+  savedBy                 SavedStrategist[]
 
   @@index([status])
   @@index([ratingAvg])
@@ -1286,3 +1289,57 @@ model RateLimitHit {
   @@index([key, timestamp])
   @@index([endpoint])
 }
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  role      String?
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  filters   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SavedStrategist {
+  id                  String   @id @default(cuid())
+  userId              String
+  strategistProfileId String
+  createdAt           DateTime @default(now())
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, strategistProfileId])
+  @@index([userId])
+  @@index([strategistProfileId])
+}
+
+model SiteAnnouncement {
+  id        String   @id @default(cuid())
+  emoji     String?  @default("⚡")
+  text      String
+  linkText  String?
+  linkUrl   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
+
