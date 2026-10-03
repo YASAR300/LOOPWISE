@@ -54,6 +54,19 @@
     --forest: #1e3b2e;
     --forest-text: #f3f7f4;
 
+    --status-needs-action-bg: #ffecec;
+    --status-needs-action-border: #f2b8b8;
+    --status-needs-action-text: #b42318;
+    --status-success-bg: #eaf7ee;
+    --status-success-border: #a9ddb8;
+    --status-success-text: #1e7a3c;
+    --status-warning-bg: #fff6d6;
+    --status-warning-border: #ebd27a;
+    --status-warning-text: #8a6a00;
+    --status-neutral-bg: #f2efe8;
+    --status-neutral-border: #dad3c3;
+    --status-neutral-text: #5b574f;
+
     /* Semantic Compatibility Mappings */
     --bg-base: var(--bg-app);
     --bg-raised: var(--panel);
@@ -93,6 +106,19 @@
     --primary-hover: #5a4ee3;
     --forest: #162c22;
     --forest-text: #f3f7f4;
+
+    --status-needs-action-bg: #331515;
+    --status-needs-action-border: #5c2020;
+    --status-needs-action-text: #f87171;
+    --status-success-bg: #14291b;
+    --status-success-border: #22502e;
+    --status-success-text: #4ade80;
+    --status-warning-bg: #2b2510;
+    --status-warning-border: #54481c;
+    --status-warning-text: #fbbf24;
+    --status-neutral-bg: #221f19;
+    --status-neutral-border: #3a352b;
+    --status-neutral-text: #b2ab9b;
 
     /* Semantic Compatibility Mappings */
     --bg-base: var(--bg-app);
@@ -185,11 +211,37 @@
   box-shadow: 0 4px 24px rgba(60, 40, 10, 0.06);
 }
 
+.dark .warm-showcase-band {
+  background: linear-gradient(135deg, #2a1a12 0%, #211c17 45%, #18221b 100%);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
 .floating-app-window {
-  background: #ffffff;
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(60, 40, 10, 0.08);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.input-base {
+  background-color: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  transition: all 150ms ease;
+}
+
+.input-base:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(111, 99, 240, 0.25);
+}
+
+.input-base::placeholder {
+  color: var(--ink-3);
 }
 
 /* Orange pill button styling */

@@ -1,4 +1,4 @@
-import React from "react";
+import { LogoMark } from "@/components/brand/logo";
 
 export function LogoLoader({ label = "Signing you in...", size = "md" }) {
   return (
@@ -6,10 +6,8 @@ export function LogoLoader({ label = "Signing you in...", size = "md" }) {
       <div className="relative flex items-center justify-center">
         {/* Outer glowing pulse ring */}
         <div className="absolute h-12 w-12 animate-ping rounded-2xl bg-brand-accent/20 opacity-75" />
-        {/* Logo box */}
-        <div className="shadow-xs relative flex h-10 w-10 items-center justify-center rounded-xl bg-brand-accent text-base font-bold text-white">
-          L
-        </div>
+        {/* Brand Logo Mark */}
+        <LogoMark className="shadow-xs relative h-10 w-10" />
       </div>
 
       {label && (

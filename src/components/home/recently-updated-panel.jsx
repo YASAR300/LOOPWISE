@@ -146,7 +146,7 @@ export function RecentlyUpdatedPanel({
                   className={`cursor-pointer select-none rounded-md border px-2.5 py-0.5 text-[11px] font-semibold transition-all ${
                     isOn
                       ? "shadow-xs border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
-                      : "border-[#3C372C] bg-[#1B1A17] text-[#F3EFE6] dark:bg-[#2A2720]"
+                      : "border-line bg-canvas text-ink-3 hover:border-line-2 hover:text-ink"
                   }`}
                 >
                   {isOn ? "On" : "Off"}

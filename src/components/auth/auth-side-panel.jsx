@@ -48,19 +48,19 @@ export function AuthSidePanel({
       title: "Map workflows",
       desc: "Decompose internal SOPs into deterministic state machines.",
       icon: GitBranch,
-      bg: "bg-[#A9A4F0]/20 text-[#4B3FD6] border-[#A9A4F0]/40",
+      bg: "bg-[#A9A4F0]/20 text-[#4B3FD6] border-[#A9A4F0]/40 dark:text-[#A5B4FC] dark:border-[#A9A4F0]/30",
     },
     {
       title: "Matched in 48 hours",
       desc: "Handpicked from the top 3% verified practitioners.",
       icon: Clock,
-      bg: "bg-[#9BE59B]/20 text-[#1E7A3C] border-[#9BE59B]/40",
+      bg: "bg-[#9BE59B]/20 text-[#1E7A3C] border-[#9BE59B]/40 dark:text-[#4ADE80] dark:border-[#9BE59B]/30",
     },
     {
       title: "Escrow-protected payments",
       desc: "Funds released only upon verified milestone delivery.",
       icon: ShieldCheck,
-      bg: "bg-[#EC6B4F]/20 text-[#D94A12] border-[#EC6B4F]/40",
+      bg: "bg-[#EC6B4F]/20 text-[#D94A12] border-[#EC6B4F]/40 dark:text-[#FB923C] dark:border-[#EC6B4F]/30",
     },
   ];
 
@@ -69,19 +69,19 @@ export function AuthSidePanel({
       title: "Vetted enterprise work",
       desc: "Direct access to funded companies with clear mandates.",
       icon: Briefcase,
-      bg: "bg-[#3FB28F]/20 text-[#0E7052] border-[#3FB28F]/40",
+      bg: "bg-[#3FB28F]/20 text-[#0E7052] border-[#3FB28F]/40 dark:text-[#34D399] dark:border-[#3FB28F]/30",
     },
     {
       title: "Fractional engagements",
       desc: "10-25 hrs/wk retainers designed for autonomous leaders.",
       icon: Award,
-      bg: "bg-[#F7C35A]/20 text-[#8A6A00] border-[#F7C35A]/40",
+      bg: "bg-[#F7C35A]/20 text-[#8A6A00] border-[#F7C35A]/40 dark:text-[#FBBF24] dark:border-[#F7C35A]/30",
     },
     {
       title: "Paid via escrow",
       desc: "Guaranteed payouts via Stripe Connect milestone contracts.",
       icon: CreditCard,
-      bg: "bg-[#F27BB3]/20 text-[#B81965] border-[#F27BB3]/40",
+      bg: "bg-[#F27BB3]/20 text-[#B81965] border-[#F27BB3]/40 dark:text-[#F472B6] dark:border-[#F27BB3]/30",
     },
   ];
 
@@ -95,7 +95,7 @@ export function AuthSidePanel({
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute -bottom-16 -left-16 h-80 w-80 rounded-full bg-brand-indigo/10 blur-[90px]"
+        className="bg-brand-indigo/10 pointer-events-none absolute -bottom-16 -left-16 h-80 w-80 rounded-full blur-[90px]"
         aria-hidden="true"
       />
 

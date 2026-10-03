@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { AuthSidePanel } from "./auth-side-panel";
 
 export const AuthContext = createContext({
@@ -39,18 +40,7 @@ export function AuthShell({
         <div className="relative z-10 flex min-h-screen w-full flex-col justify-between p-6 sm:p-8 lg:w-[46%] lg:p-12">
           {/* Top Logo */}
           <div className="flex items-center justify-between">
-            <Link
-              href="/"
-              className="group inline-flex items-center gap-2.5"
-              aria-label="Loopwise Home"
-            >
-              <div className="shadow-xs flex h-8 w-8 items-center justify-center rounded-xl bg-brand-accent text-sm font-bold text-white transition-transform group-hover:scale-105">
-                L
-              </div>
-              <span className="font-sans text-lg font-bold tracking-tight text-ink">
-                LOOPWISE
-              </span>
-            </Link>
+            <Logo href="/" markClassName="h-8 w-8" textClassName="text-xl" />
 
             <Link
               href="/"

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/layout/theme-provider";
 import { createClient } from "@/lib/supabase/client";
+import { Logo } from "@/components/brand/logo";
 
 export function Topbar({ currentUser = null, breadcrumbs = [] }) {
   const pathname = usePathname();
@@ -111,12 +112,7 @@ export function Topbar({ currentUser = null, breadcrumbs = [] }) {
           }
           className="group flex items-center gap-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo"
         >
-          <div className="shadow-2xs flex h-6 w-6 items-center justify-center rounded-md bg-brand-accent text-xs font-bold text-white">
-            L
-          </div>
-          <span className="font-display text-base font-bold tracking-tight text-ink">
-            Loopwise
-          </span>
+          <Logo href={null} markClassName="h-6 w-6" textClassName="text-base" />
         </Link>
       </div>
 

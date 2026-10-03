@@ -4,26 +4,12 @@ import React from "react";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
+import { LogoMark } from "@/components/brand/logo";
+
 export function FooterWordmark() {
   return (
     <div className="flex items-center gap-2.5">
-      <svg
-        viewBox="0 0 32 32"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-7 w-7"
-        aria-hidden="true"
-      >
-        <rect x="2" y="2" width="28" height="28" rx="8" fill="#F25C1F" />
-        <path
-          d="M8 16C8 12 11 9 15 9C19 9 20 13 20 16C20 19 21 23 25 23"
-          stroke="#FFFFFF"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <circle cx="8" cy="16" r="2.5" fill="#2B1330" />
-        <circle cx="24" cy="16" r="3" fill="#FFFDF9" />
-      </svg>
+      <LogoMark className="h-7 w-7" />
       <span className="font-display text-xl font-bold tracking-tight text-[#FFFDF9]">
         Loopwise
       </span>

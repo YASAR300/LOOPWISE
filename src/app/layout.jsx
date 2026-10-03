@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { KeyboardShortcutProvider } from "@/components/layout/keyboard-shortcuts";
 import { CommandPaletteProvider } from "@/components/layout/command-palette";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata = {
   title: {
@@ -40,9 +41,11 @@ export default async function RootLayout({ children }) {
       <body className="min-h-screen bg-canvas font-sans text-ink antialiased selection:bg-brand-accent/20 selection:text-ink">
         <ThemeProvider initialTheme={themeCookie}>
           <ToastProvider>
-            <KeyboardShortcutProvider>
-              <CommandPaletteProvider>{children}</CommandPaletteProvider>
-            </KeyboardShortcutProvider>
+            <TooltipProvider>
+              <KeyboardShortcutProvider>
+                <CommandPaletteProvider>{children}</CommandPaletteProvider>
+              </KeyboardShortcutProvider>
+            </TooltipProvider>
           </ToastProvider>
         </ThemeProvider>
       </body>

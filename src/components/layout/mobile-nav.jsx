@@ -18,7 +18,7 @@ import {
   Sun,
   ShieldCheck,
 } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/layout/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 
 export function MobileNav({ currentUser = null }) {
