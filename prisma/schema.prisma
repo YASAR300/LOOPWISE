@@ -144,6 +144,8 @@ enum IncidentStatus {
 
 enum QuestionType {
   MULTIPLE_CHOICE
+  RANKED_PRIORITY
+  FREE_TEXT
   CODE
   OPEN_ENDED
 }
@@ -313,17 +315,33 @@ model Invitation {
 model StrategistProfile {
   id                      String           @id @default(cuid())
   userId                  String           @unique
+  slug                    String?          @unique
   headline                String?
   bio                     String?          @db.Text
   location                String?
   timezone                String?
+  website                 String?
+  linkedinUrl             String?
+  githubUrl               String?
+  phone                   String?
+  stripeAccountId         String?
+  stripeOnboarded         Boolean          @default(false)
   yearsExperience         Int?
   hourlyRateMin           Float?
   hourlyRateMax           Float?
   retainerMin             Float?
   retainerMax             Float?
   availabilityHoursPerWeek Int?
+  preferredMinWeeks       Int?             @default(4)
+  engagementModels        Json?
+  industries              Json?
+  certifications          Json?
+  onboardingStep          Int              @default(1)
+  onboardingData          Json?
   status                  StrategistStatus @default(DRAFT)
+  rejectionReason         String?          @db.Text
+  slaDeadline             DateTime?
+  assignedReviewerId      String?
   verifiedAt              DateTime?
   ratingAvg               Float            @default(0)
   ratingCount             Int              @default(0)
@@ -351,6 +369,7 @@ model StrategistProfile {
 
   @@index([status])
   @@index([ratingAvg])
+  @@index([slug])
 }
 
 model Specialization {
@@ -410,11 +429,17 @@ model CaseStudy {
   strategistProfileId String
   title              String
   clientIndustry     String?
+  clientType         String?
   problem            String   @db.Text
   solution           String   @db.Text
+  approach           String?  @db.Text
   toolsUsed          Json?    // list of tool names/slugs
   metricsAchieved    String?
   outcome            String?  @db.Text
+  outcomeNumber      Float?
+  outcomeUnit        String?
+  isConfidential     Boolean  @default(false)
+  proofUrl           String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -452,14 +477,17 @@ model Assessment {
 }
 
 model AssessmentQuestion {
-  id           String       @id @default(cuid())
-  assessmentId String
-  prompt       String       @db.Text
-  type         QuestionType @default(MULTIPLE_CHOICE)
-  options      Json?        // Array of choices
+  id            String       @id @default(cuid())
+  assessmentId  String
+  domain        String?
+  scenario      String?      @db.Text
+  prompt        String       @db.Text
+  type          QuestionType @default(MULTIPLE_CHOICE)
+  options       Json?        // Array of choices
   correctOption String?
-  rubric       Json?
-  points       Int          @default(10)
+  rubric        Json?
+  points        Int          @default(10)
+  order         Int          @default(0)
 
   assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
 
@@ -467,14 +495,18 @@ model AssessmentQuestion {
 }
 
 model AssessmentAttempt {
-  id                 String    @id @default(cuid())
-  assessmentId       String
-  strategistProfileId String
-  score              Float?
-  passed             Boolean?
-  answers            Json
-  evaluatedAt        DateTime?
-  createdAt          DateTime  @default(now())
+  id                   String    @id @default(cuid())
+  assessmentId         String
+  strategistProfileId   String
+  score                Float?
+  passed               Boolean?
+  answers              Json
+  aiEvaluations        Json?
+  rubricVersion        String    @default("1.0")
+  timeRemainingSeconds Int?
+  startedAt            DateTime  @default(now())
+  evaluatedAt          DateTime?
+  createdAt            DateTime  @default(now())
 
   assessment        Assessment        @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
