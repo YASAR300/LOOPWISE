@@ -20,6 +20,10 @@ export const metadata = {
     index: true,
     follow: true,
   },
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/icon" }],
+    apple: "/apple-icon",
+  },
 };
 
 export default async function RootLayout({ children }) {
