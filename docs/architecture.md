@@ -68,3 +68,52 @@ src/
 2. **Four States Rule**: Every list, form, and data widget handles `loading`, `empty`, `error`, and `success`.
 3. **Security First**: All mutations verify session, user role, and resource ownership before execution.
 4. **Accessible & Keyboard Driven**: Full ARIA compliance, tab indexing, visible focus rings, and shortcut chord navigation.
+
+## 5. Domain Entity-Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+    User ||--o{ Account : has
+    User ||--o{ Session : has
+    User ||--o{ OrgMember : belongs_to
+    User ||--o| StrategistProfile : "profile (role=STRATEGIST)"
+    User ||--o| NotificationPreference : configures
+    User ||--o{ Notification : receives
+    User ||--o{ AuditLog : generates
+
+    Organization ||--o{ OrgMember : employs
+    Organization ||--o{ Brief : posts
+    Organization ||--o{ Engagement : contracts
+    Organization ||--o{ Invoice : billed
+    Organization ||--o{ Agent : owns
+    Organization ||--o{ Workflow : maps
+
+    StrategistProfile ||--o{ StrategistSpecialization : specializes_in
+    Specialization ||--o{ StrategistSpecialization : tagged
+    StrategistProfile ||--o{ StrategistSkill : possesses
+    Skill ||--o{ StrategistSkill : categorized
+    StrategistProfile ||--o{ CaseStudy : showcases
+    StrategistProfile ||--o{ AvailabilitySlot : schedules
+    StrategistProfile ||--o{ Proposal : submits
+    StrategistProfile ||--o{ Engagement : delivers
+    StrategistProfile ||--o{ Payout : receives
+
+    Brief ||--o{ Proposal : receives
+    Brief ||--o{ MatchResult : computes
+    Proposal ||--o| Engagement : converts_to
+
+    Engagement ||--o{ Contract : governs
+    Engagement ||--o{ Milestone : tracks
+    Milestone ||--o{ Deliverable : contains
+    Engagement ||--o{ TimeEntry : logs
+    Engagement ||--o| EscrowAccount : holds_funds
+    Engagement ||--o{ Dispute : arbitrates
+
+    Invoice ||--o{ InvoiceLine : items
+    Invoice ||--o{ Refund : adjusts
+
+    Agent ||--o{ AgentVersion : versions
+    Agent ||--o{ AgentHealthEvent : monitors
+    Agent ||--o{ Incident : triggers
+    Agent ||--o{ MetricSnapshot : telemetry
+```

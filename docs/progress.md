@@ -40,5 +40,52 @@
 
 ### Known Limitations & Next Steps:
 
-- Authentication backend, database tables, and real session verification will be wired in Prompt 2.
-- Currently, `/login` provides the static auth layout card.
+- Completed in Prompt 2: Data domain, Supabase Auth, roles, settings, route protection.
+
+---
+
+## Prompt 2 of 12: Database, Auth, Roles
+
+### Status: Complete
+
+### What Shipped:
+
+1. **Complete Domain Prisma Schema (`prisma/schema.prisma`)**:
+   - 60+ models covering all 12 prompts upfront to avoid mid-stream migrations churn.
+   - Enums: `UserRole` (CLIENT, STRATEGIST, ADMIN), `StrategistStatus`, `SkillCategory`, `EngagementStatus`, `InvoiceStatus`, `AgentStatus`, and more.
+   - Core tables: `User`, `Account`, `Session`, `Organization`, `OrgMember`, `StrategistProfile`, `Specialization`, `Skill`, `StrategistSkill`, `CaseStudy`, `AvailabilitySlot`, `Brief`, `Proposal`, `Engagement`, `Contract`, `Milestone`, `Deliverable`, `TimeEntry`, `Invoice`, `LedgerEntry`, `EscrowAccount`, `Agent`, `Incident`, `AuditLog`, `RateLimitHit`, `NotificationPreference`.
+   - Dual connection URLs configured for Neon PostgreSQL (`DATABASE_URL` pooler + `DIRECT_URL` direct).
+
+2. **Supabase Auth & Prisma Sync (`src/lib/auth.js`, `src/lib/supabase/*`)**:
+   - Browser, server, and admin Supabase SSR clients.
+   - Email/password and Google OAuth authentication flows.
+   - User profile sync between Supabase auth metadata and Prisma `User` table.
+   - Server-only authz helpers (`requireUser()`, `requireRole()`, `requireOrgMember()`, `assertOwns()`).
+
+3. **Rate Limiting & Security (`src/lib/rate-limit.js`, `src/middleware.js`, `src/lib/audit.js`)**:
+   - Rate limiter backed by `RateLimitHit` database table with sliding window and 429 Retry-After response.
+   - Edge route protection via Supabase SSR middleware: `/client/*` requires CLIENT, `/strategist/*` requires STRATEGIST, `/admin/*` requires ADMIN, `/settings/*` requires authenticated user.
+   - Custom `403 Forbidden` page with clean Linear aesthetics.
+   - Audit logging for sign in, sign out, password changes, and sensitive profile updates.
+
+4. **Authentication & Settings UI (`src/app/(auth)/*`, `src/app/(app)/settings/*`)**:
+   - `/login`: Email + password + Google OAuth + quick demo accounts switcher.
+   - `/signup`: Role selector ("I want to hire" vs "I'm an AI Strategist") + Google OAuth + email signup.
+   - `/forgot-password`: Rate-limited recovery link delivery with anti-enumeration protection.
+   - `/reset-password`: In-app password update.
+   - `/settings`: 4-tab panel (Profile with avatar upload, Password change, Notification toggles, Danger Zone account deletion).
+   - `/client/dashboard`, `/strategist/dashboard`, `/admin/dashboard`: Role-specific telemetry and workspaces.
+   - Sidebar and workspace switcher wired to dynamic organization memberships.
+
+5. **Idempotent Seed Script (`prisma/seed.js`)**:
+   - 8 Specializations and 56+ taxonomy Skills.
+   - Demo Admin (`admin@loopwise.internal`).
+   - 2 Client Organizations: Acme Enterprise (`alex.carter@enterprise.ai`) & Apex Health AI (`sarah.lin@apexhealth.io`).
+   - 12 Vetted Strategists with APPROVED status, case studies, verified skills, and availability slots.
+   - Sample autonomous agents for demo org.
+   - Command: `npm run db:seed` and `npm run db:reset`.
+
+6. **Automated Testing**:
+   - Unit tests for authz helpers (`src/server/__tests__/authz.test.js` - 12 tests).
+   - Unit tests for rate limiter (`src/lib/__tests__/rate-limit.test.js` - 4 tests).
+   - All 6 test suites (23 tests total) passing.

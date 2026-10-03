@@ -2,6 +2,21 @@
 
 All notable changes to the Loopwise platform are documented in this file.
 
+## [0.2.0] - 2026-10-03
+
+### Added
+
+- Complete 60+ model Prisma domain schema in `prisma/schema.prisma` targeting Neon PostgreSQL.
+- Idempotent seed script `prisma/seed.js` with 8 specializations, 56+ taxonomy skills, demo admin, 2 client organizations, 12 vetted strategists with profiles and case studies.
+- Supabase Auth integration supporting email/password and Google OAuth with Prisma user synchronization.
+- Authorization and role protection helpers in `src/server/authz.js` (`requireUser`, `requireRole`, `requireOrgMember`, `assertOwns`).
+- Rate limiting mechanism in `src/lib/rate-limit.js` backed by `RateLimitHit` table.
+- Edge route protection middleware (`src/middleware.js`) with role routing and `/403` enforcement.
+- Auth UI pages: `/login` (with demo account switcher), `/signup` (with role toggle), `/forgot-password`, `/reset-password`, `/verify-email`.
+- Dedicated role workspaces: `/client/dashboard`, `/strategist/dashboard`, `/admin/dashboard`.
+- Account Settings page (`/settings` and `/app/settings`) with profile avatar upload, password change, notification preferences, and danger zone.
+- Unit tests for authorization helpers and rate limiter (23 total unit tests passing).
+
 ## [0.1.0] - 2026-10-03
 
 ### Added
