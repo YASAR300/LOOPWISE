@@ -37,7 +37,7 @@ src/
 ├── lib/
 │   ├── db.js                  # Prisma client singleton
 │   ├── auth.js                # Auth.js configuration and helpers
-│   ├── ai.js                  # Anthropic SDK server-only wrapper
+│   ├── ai.js                  # Groq API via OpenAI-compatible client wrapper
 │   ├── stripe.js              # Stripe client & webhook utilities
 │   ├── email.js               # Resend / local Mailpit mail sender
 │   ├── storage.js             # Local / S3 file storage abstraction
