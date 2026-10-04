@@ -183,6 +183,8 @@ model User {
   templatePurchases     TemplatePurchase[]
   savedSearches         SavedSearch[]
   savedStrategists      SavedStrategist[]
+  contractVersions      ContractVersion[]
+  contractComments      ContractComment[]
 
   @@index([email])
   @@index([role])
@@ -282,6 +284,7 @@ model Organization {
   reports             Report[]
   briefInvitations    BriefInvitation[]
   dismissedMatches    DismissedMatch[]
+  replacementRequests ReplacementRequest[]
 
   @@index([slug])
 }
@@ -873,33 +876,43 @@ model SavedJob {
 // ==============================================================================
 
 model Engagement {
-  id                 String           @id @default(cuid())
-  organizationId     String
+  id                  String           @id @default(cuid())
+  organizationId      String
   strategistProfileId String
-  jobId              String?
-  briefId            String?
-  title              String
-  status             EngagementStatus @default(PENDING)
-  model              EngagementModel  @default(RETAINER)
-  rate               Float
-  startDate          DateTime?
-  endDate            DateTime?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  deletedAt          DateTime?
+  jobId               String?
+  briefId             String?
+  title               String
+  status              EngagementStatus @default(PENDING)
+  model               EngagementModel  @default(RETAINER)
+  rate                Float
+  hourlyWeeklyCap     Int?
+  startDate           DateTime?
+  endDate             DateTime?
+  healthStatus        String           @default("ON_TRACK") // ON_TRACK | AT_RISK | NEEDS_ATTENTION
+  pauseReason         String?          @db.Text
+  endReason           String?          @db.Text
+  endFeedback         String?          @db.Text
+  closedAt            DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  deletedAt           DateTime?
 
-  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
-  job               Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  brief             Brief?            @relation(fields: [briefId], references: [id], onDelete: SetNull)
-  contract          Contract?
-  milestones        Milestone[]
-  timeEntries       TimeEntry[]
-  activityEvents    ActivityEvent[]
-  invoices          Invoice[]
-  escrowAccount     EscrowAccount?
-  disputes          Dispute[]
-  review            Review?
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  strategistProfile   StrategistProfile   @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
+  job                 Job?                @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  brief               Brief?              @relation(fields: [briefId], references: [id], onDelete: SetNull)
+  contract            Contract?
+  milestones          Milestone[]
+  deliverables        Deliverable[]
+  weeklyUpdates       WeeklyCadenceUpdate[]
+  timeEntries         TimeEntry[]
+  files               EngagementFile[]
+  activityEvents      ActivityEvent[]
+  replacementRequests ReplacementRequest[]
+  invoices            Invoice[]
+  escrowAccount       EscrowAccount?
+  disputes            Dispute[]
+  review              Review?
 
   @@index([organizationId])
   @@index([strategistProfileId])
@@ -907,16 +920,69 @@ model Engagement {
 }
 
 model Contract {
-  id                     String    @id @default(cuid())
-  engagementId           String    @unique
-  termsMd                String    @db.Text
-  signedByClientAt       DateTime?
-  signedByStrategistAt   DateTime?
-  stripeSubscriptionId   String?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  id                        String            @id @default(cuid())
+  engagementId              String            @unique
+  termsMd                   String            @db.Text
+  status                    String            @default("DRAFT") // DRAFT | SENT | CHANGES_REQUESTED | ACCEPTED | ACTIVE | PAUSED | COMPLETED | TERMINATED
+  scopeOfWork               String?           @db.Text
+  model                     String            @default("RETAINER") // RETAINER | HOURLY | FIXED
+  rate                      Float             @default(0)
+  hourlyWeeklyCap           Int?
+  weeklyHours               Int?
+  startDate                 DateTime?
+  endDate                   DateTime?
+  noticePeriodDays          Int               @default(14)
+  ipAssignmentClause        String?           @db.Text
+  confidentialityClause     String?           @db.Text
+  terminationClause         String?           @db.Text
+  clientSignedName          String?
+  clientSignedAt            DateTime?
+  clientSignedIp            String?
+  clientSignedUserAgent     String?
+  strategistSignedName      String?
+  strategistSignedAt        DateTime?
+  strategistSignedIp        String?
+  strategistSignedUserAgent String?
+  signedByClientAt          DateTime?
+  signedByStrategistAt      DateTime?
+  stripeSubscriptionId      String?
+  pdfSnapshotUrl            String?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
 
-  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  engagement Engagement        @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  versions   ContractVersion[]
+  comments   ContractComment[]
+}
+
+model ContractVersion {
+  id             String   @id @default(cuid())
+  contractId     String
+  versionNumber  Int
+  termsMd        String   @db.Text
+  scopeOfWork    String?  @db.Text
+  changesSummary String?  @db.Text
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  contract  Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+}
+
+model ContractComment {
+  id         String   @id @default(cuid())
+  contractId String
+  authorId   String
+  authorRole String   // CLIENT | STRATEGIST
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  author   User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
 }
 
 model Milestone {
@@ -937,33 +1003,118 @@ model Milestone {
 }
 
 model Deliverable {
-  id          String            @id @default(cuid())
-  milestoneId String
-  title       String
-  description String?           @db.Text
-  assetUrl    String?
-  status      DeliverableStatus @default(DRAFT)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id                   String            @id @default(cuid())
+  engagementId         String
+  milestoneId          String?
+  title                String
+  description          String?           @db.Text
+  stage                String            @default("BACKLOG") // BACKLOG | IN_PROGRESS | IN_REVIEW | APPROVED
+  order                Int               @default(0)
+  dueDate              DateTime?
+  assigneeId           String?
+  labels               Json?             // Array of strings
+  checklist            Json?             // Array of { id, text, done }
+  comments             Json?             // Array of { id, authorName, authorRole, text, createdAt }
+  attachments          Json?             // Array of { name, url, size }
+  clientApprovalStatus String?           // PENDING | APPROVED | CHANGES_REQUESTED
+  clientFeedback       String?           @db.Text
+  assetUrl             String?
+  status               DeliverableStatus @default(DRAFT)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
-  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  engagement  Engagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  milestone   Milestone?       @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  timeEntries TimeEntry[]
+  files       EngagementFile[]
 
+  @@index([engagementId])
   @@index([milestoneId])
+  @@index([stage])
 }
 
-model TimeEntry {
-  id           String   @id @default(cuid())
-  engagementId String
-  date         DateTime
-  hours        Float
-  description  String   @db.Text
-  billable     Boolean  @default(true)
-  invoiced     Boolean  @default(false)
-  createdAt    DateTime @default(now())
+model WeeklyCadenceUpdate {
+  id               String    @id @default(cuid())
+  engagementId     String
+  weekNumber       Int
+  startDate        DateTime
+  endDate          DateTime
+  done             String    @db.Text
+  next             String    @db.Text
+  risks            String?   @db.Text
+  decisionsNeeded  String?   @db.Text
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  clientReaction   String?   // THUMBS_UP | CELEBRATE | EYE | QUESTION
+  clientNotes      String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
 
   @@index([engagementId])
+}
+
+model TimeEntry {
+  id            String    @id @default(cuid())
+  engagementId  String
+  deliverableId String?
+  date          DateTime
+  hours         Float
+  description   String    @db.Text
+  billable      Boolean   @default(true)
+  invoiced      Boolean   @default(false)
+  timesheetWeek String?   // e.g. "2026-W40"
+  status        String    @default("PENDING") // PENDING | APPROVED | DISPUTED
+  disputeReason String?   @db.Text
+  approvedAt    DateTime?
+  approvedById  String?
+  isRunning     Boolean   @default(false)
+  startTime     DateTime?
+  createdAt     DateTime  @default(now())
+
+  engagement  Engagement   @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  deliverable Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+
+  @@index([engagementId])
+  @@index([deliverableId])
+  @@index([timesheetWeek])
+}
+
+model EngagementFile {
+  id            String    @id @default(cuid())
+  engagementId  String
+  deliverableId String?
+  name          String
+  fileUrl       String
+  fileSize      Int?
+  fileType      String?
+  version       Int       @default(1)
+  uploadedById  String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  engagement  Engagement   @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  deliverable Deliverable? @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+
+  @@index([engagementId])
+}
+
+model ReplacementRequest {
+  id             String    @id @default(cuid())
+  engagementId   String
+  organizationId String
+  reason         String    @db.Text
+  status         String    @default("PENDING") // PENDING | IN_REVIEW | RESOLVED | REJECTED
+  adminNotes     String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  engagement   Engagement   @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([engagementId])
+  @@index([organizationId])
 }
 
 model ActivityEvent {

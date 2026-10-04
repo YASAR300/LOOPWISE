@@ -78,6 +78,106 @@ export async function POST(request, { params }) {
     } else if (action === "accept") {
       updatedStatus = "ACCEPTED";
 
+      // Initialize Engagement & Contract
+      const orgId = proposal.job.organization.id;
+      const model = proposal.proposedModel || "RETAINER";
+      const rate = proposal.proposedRate || 5000;
+      const hourlyWeeklyCap = proposal.hoursPerWeek || 20;
+
+      let engagement = await db.engagement.findFirst({
+        where: {
+          organizationId: orgId,
+          strategistProfileId: proposal.strategistProfileId,
+          jobId: proposal.jobId,
+        },
+        include: { contract: true },
+      });
+
+      if (!engagement) {
+        engagement = await db.engagement.create({
+          data: {
+            organizationId: orgId,
+            strategistProfileId: proposal.strategistProfileId,
+            jobId: proposal.jobId,
+            briefId: proposal.briefId || null,
+            title: proposal.job.title,
+            model,
+            rate,
+            hourlyWeeklyCap,
+            status: "PENDING",
+            startDate: proposal.startDate || new Date(),
+          },
+        });
+      }
+
+      let contract = await db.contract.findUnique({
+        where: { engagementId: engagement.id },
+      });
+
+      if (!contract) {
+        const { buildContractMarkdown, STANDARD_CLAUSES } =
+          await import("@/lib/contract-templates");
+        const termsMd = buildContractMarkdown({
+          clientOrgName: proposal.job.organization.name,
+          clientSignerName: user.name || "Authorized Representative",
+          strategistName: proposal.strategistProfile.user?.name || "Strategist",
+          strategistEmail: proposal.strategistProfile.user?.email,
+          engagementModel: model,
+          rate,
+          hourlyWeeklyCap,
+          weeklyHours: hourlyWeeklyCap,
+          startDate: proposal.startDate || new Date(),
+          scopeOfWork: proposal.coverLetter,
+        });
+
+        contract = await db.contract.create({
+          data: {
+            engagementId: engagement.id,
+            termsMd,
+            scopeOfWork: proposal.coverLetter,
+            model,
+            rate,
+            hourlyWeeklyCap,
+            weeklyHours: hourlyWeeklyCap,
+            startDate: proposal.startDate || new Date(),
+            noticePeriodDays: 14,
+            ipAssignmentClause: STANDARD_CLAUSES.ipAssignment,
+            confidentialityClause: STANDARD_CLAUSES.confidentiality,
+            terminationClause: STANDARD_CLAUSES.termination,
+            status: "SENT",
+            versions: {
+              create: {
+                versionNumber: 1,
+                termsMd,
+                scopeOfWork: proposal.coverLetter,
+                changesSummary: "Contract generated from accepted proposal",
+                createdById: user.id,
+              },
+            },
+          },
+        });
+      }
+
+      // Convert milestones if present
+      if (
+        Array.isArray(proposal.milestones) &&
+        proposal.milestones.length > 0
+      ) {
+        for (const m of proposal.milestones) {
+          if (m.title && m.amount) {
+            await db.milestone.create({
+              data: {
+                engagementId: engagement.id,
+                title: m.title,
+                amount: parseFloat(m.amount) || 0,
+                dueDate: m.dueDate ? new Date(m.dueDate) : null,
+                status: "PENDING",
+              },
+            });
+          }
+        }
+      }
+
       // Notify strategist
       if (proposal.strategistProfile.user?.id) {
         await db.notification.create({
@@ -85,8 +185,8 @@ export async function POST(request, { params }) {
             userId: proposal.strategistProfile.user.id,
             type: "PROPOSAL_STATUS_CHANGED",
             title: `Proposal Accepted! 🎉`,
-            body: `${proposal.job.organization.name} accepted your proposal for ${proposal.job.title}. Next step: engagement contract setup.`,
-            actionUrl: `/strategist/engagements`,
+            body: `${proposal.job.organization.name} accepted your proposal for ${proposal.job.title}. Next step: review & e-sign contract.`,
+            actionUrl: `/strategist/engagements/${engagement.id}`,
           },
         });
 
@@ -94,10 +194,32 @@ export async function POST(request, { params }) {
           await sendEmail({
             to: proposal.strategistProfile.user.email,
             subject: `Congratulations! Your proposal for ${proposal.job.title} was accepted`,
-            html: `<p>Hi ${proposal.strategistProfile.user.name},</p><p>Great news! <strong>${proposal.job.organization.name}</strong> has accepted your proposal for <strong>${proposal.job.title}</strong>.</p><p><a href="${process.env.NEXTAUTH_URL || "https://loopwise.app"}/strategist/engagements">Review Engagement Setup</a></p>`,
+            html: `<p>Hi ${proposal.strategistProfile.user.name},</p><p>Great news! <strong>${proposal.job.organization.name}</strong> has accepted your proposal for <strong>${proposal.job.title}</strong>.</p><p><a href="${process.env.NEXTAUTH_URL || "https://loopwise.app"}/strategist/engagements/${engagement.id}">Review & Sign Agreement</a></p>`,
           });
         }
       }
+
+      // Add activity event
+      await db.activityEvent.create({
+        data: {
+          engagementId: engagement.id,
+          actorId: user.id,
+          type: "PROPOSAL_ACCEPTED",
+          title: `Proposal accepted and agreement prepared for ${proposal.strategistProfile.user?.name}`,
+        },
+      });
+
+      const updated = await db.proposal.update({
+        where: { id: proposalId },
+        data: { status: "ACCEPTED" },
+      });
+
+      return NextResponse.json({
+        success: true,
+        proposal: updated,
+        engagementId: engagement.id,
+        contractId: contract.id,
+      });
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
