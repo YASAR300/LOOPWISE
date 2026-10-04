@@ -280,6 +280,8 @@ model Organization {
   workflows           Workflow[]
   meetingRequests     MeetingRequest[]
   reports             Report[]
+  briefInvitations    BriefInvitation[]
+  dismissedMatches    DismissedMatch[]
 
   @@index([slug])
 }
@@ -374,6 +376,9 @@ model StrategistProfile {
   meetingRequests         MeetingRequest[]
   reports                 Report[]
   savedBy                 SavedStrategist[]
+  briefInvitations        BriefInvitation[]
+  dismissedMatches        DismissedMatch[]
+  savedJobs               SavedJob[]
 
   @@index([status])
   @@index([ratingAvg])
@@ -574,6 +579,10 @@ model Brief {
   shortlists      Shortlist[]
   matchResults    MatchResult[]
   engagements     Engagement[]
+  proposals       Proposal[]
+  invitations     BriefInvitation[]
+  dismissedMatches DismissedMatch[]
+  matchingQueues  MatchingQueue[]
 
   @@index([organizationId])
   @@index([status])
@@ -658,24 +667,32 @@ model WorkflowStep {
 }
 
 model Job {
-  id             String          @id @default(cuid())
-  organizationId String
-  briefId        String?
-  title          String
-  description    String          @db.Text
-  model          EngagementModel @default(RETAINER)
-  budget         Float?
-  status         String          @default("OPEN") // OPEN | PAUSED | CLOSED
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  deletedAt      DateTime?
+  id                 String          @id @default(cuid())
+  organizationId     String
+  briefId            String?
+  title              String
+  description        String          @db.Text
+  model              EngagementModel @default(RETAINER)
+  budget             Float?
+  isPublic           Boolean         @default(true)
+  screeningQuestions Json?           // Array of questions (max 5)
+  hoursPerWeek       Int?
+  timeline           String?
+  timezonePref       String?
+  requiredSkills     Json?
+  status             String          @default("OPEN") // OPEN | PAUSED | CLOSED
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  deletedAt          DateTime?
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  brief        Brief?        @relation(fields: [briefId], references: [id], onDelete: SetNull)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brief        Brief?            @relation(fields: [briefId], references: [id], onDelete: SetNull)
   skills       JobSkill[]
   proposals    Proposal[]
   engagements  Engagement[]
   matchResults MatchResult[]
+  savedBy      SavedJob[]
+  invitations  BriefInvitation[]
 
   @@index([organizationId])
   @@index([status])
@@ -694,22 +711,34 @@ model JobSkill {
 }
 
 model Proposal {
-  id                 String   @id @default(cuid())
-  jobId              String
+  id                  String   @id @default(cuid())
+  jobId               String
+  briefId             String?
   strategistProfileId String
-  coverLetter        String   @db.Text
-  proposedRate       Float
-  proposedModel      String   @default("RETAINER")
-  timelineWeeks      Int?
-  status             String   @default("SUBMITTED") // SUBMITTED | SHORTLISTED | ACCEPTED | DECLINED
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  coverLetter         String   @db.Text
+  proposedRate        Float
+  proposedModel       String   @default("RETAINER")
+  hoursPerWeek        Int?
+  timelineWeeks       Int?
+  startDate           DateTime?
+  milestones          Json?    // Optional milestone plan rows: [{ title, amount, dueDate }]
+  attachments         Json?    // Uploaded attachment metadata
+  screeningAnswers    Json?    // Answers to job/brief screening questions
+  status              String   @default("SENT") // SENT | VIEWED | SHORTLISTED | ACCEPTED | DECLINED | WITHDRAWN
+  viewedAt            DateTime?
+  declineReason       String?  @db.Text
+  changeRequestNotes  String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   job               Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  brief             Brief?            @relation(fields: [briefId], references: [id], onDelete: SetNull)
   strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
+  @@index([briefId])
   @@index([strategistProfileId])
+  @@index([status])
 }
 
 model Shortlist {
@@ -742,22 +771,101 @@ model ShortlistItem {
 }
 
 model MatchResult {
-  id                 String   @id @default(cuid())
-  briefId            String?
-  jobId              String?
+  id                  String   @id @default(cuid())
+  briefId             String?
+  jobId               String?
   strategistProfileId String
-  score              Float
-  breakdown          Json
-  explanation        String   @db.Text
-  createdAt          DateTime @default(now())
+  score               Float
+  breakdown           Json
+  explanation         String   @db.Text
+  watchOuts           String?  @db.Text
+  aiReranked          Boolean  @default(false)
+  briefVersion        Int      @default(1)
+  profileVersion      Int      @default(1)
+  isShortlisted       Boolean  @default(false)
+  isDismissed         Boolean  @default(false)
+  dismissReason       String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
 
   brief             Brief?            @relation(fields: [briefId], references: [id], onDelete: Cascade)
   job               Job?              @relation(fields: [jobId], references: [id], onDelete: Cascade)
   strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
 
+  @@unique([briefId, strategistProfileId])
   @@index([briefId])
   @@index([jobId])
   @@index([strategistProfileId])
+  @@index([score])
+}
+
+model BriefInvitation {
+  id                  String   @id @default(cuid())
+  briefId             String
+  jobId               String?
+  organizationId      String
+  strategistProfileId String
+  status              String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  message             String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
+
+  brief             Brief             @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  job               Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([briefId, strategistProfileId])
+  @@index([briefId])
+  @@index([strategistProfileId])
+  @@index([organizationId])
+  @@index([status])
+}
+
+model DismissedMatch {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  briefId             String
+  strategistProfileId String
+  reason              String   @db.Text
+  createdAt           DateTime @default(now())
+
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brief             Brief             @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([briefId, strategistProfileId])
+  @@index([organizationId])
+  @@index([briefId])
+}
+
+model MatchingQueue {
+  id        String   @id @default(cuid())
+  briefId   String
+  status    String   @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
+  error     String?
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brief Brief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([briefId])
+}
+
+model SavedJob {
+  id                  String   @id @default(cuid())
+  strategistProfileId String
+  jobId               String
+  createdAt           DateTime @default(now())
+
+  strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
+  job               Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([strategistProfileId, jobId])
+  @@index([strategistProfileId])
+  @@index([jobId])
 }
 
 // ==============================================================================
