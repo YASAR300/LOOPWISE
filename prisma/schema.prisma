@@ -254,6 +254,14 @@ model Organization {
   size                String?
   website             String?
   logo                String?
+  toolsInUse          Json?
+  complianceNeeds     Json?
+  billingContactName  String?
+  billingContactEmail String?
+  billingAddress      String?
+  aiAnalysisQuota     Int                @default(50)
+  aiAnalysisUsed      Int                @default(0)
+  aiQuotaResetAt      DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   deletedAt           DateTime?
@@ -534,18 +542,28 @@ model VettingReview {
 // ==============================================================================
 
 model Brief {
-  id                 String      @id @default(cuid())
+  id                 String          @id @default(cuid())
   organizationId     String
   createdById        String
   title              String
-  problemDescription String      @db.Text
+  problemDescription String          @db.Text
   currentTools       Json?
-  targetOutcomes     String?     @db.Text
+  targetOutcomes     String?         @db.Text
   budgetMin          Float?
   budgetMax          Float?
-  status             BriefStatus @default(DRAFT)
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  status             BriefStatus     @default(DRAFT)
+  goal               String?
+  teamSize           String?
+  timeline           String?
+  hoursPerWeek       Int?
+  preferredModel     EngagementModel @default(RETAINER)
+  requiredSkills     Json?
+  complianceNeeds    Json?
+  timezonePref       String?
+  isNdaRequired      Boolean         @default(false)
+  opportunitySummary Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
   deletedAt          DateTime?
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -562,39 +580,53 @@ model Brief {
 }
 
 model WorkflowSource {
-  id             String        @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   briefId        String?
   name           String
-  type           String        // BPMN | LOOM_TRANSCRIPT | SCREEN_RECORDING | API_SPEC | DOCUMENTATION
-  rawContent     String?       @db.Text
+  type           String   // BPMN | LOOM_TRANSCRIPT | SCREEN_RECORDING | API_SPEC | DOCUMENTATION | SOP_TEXT | FILE_UPLOAD | GUIDED_FORM
+  rawContent     String?  @db.Text
   fileUrl        String?
+  fileName       String?
+  extractedText  String?  @db.Text
   metadata       Json?
-  createdAt      DateTime      @default(now())
+  createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   brief        Brief?       @relation(fields: [briefId], references: [id], onDelete: SetNull)
+  workflows    Workflow[]
 
   @@index([organizationId])
   @@index([briefId])
 }
 
 model Workflow {
-  id             String         @id @default(cuid())
-  organizationId String
-  briefId        String?
-  name           String
-  description    String?        @db.Text
-  diagramData    Json?          // React Flow nodes and edges
-  status         String         @default("MAPPED") // MAPPED | OPTIMIZED | AGENT_ENABLED
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                  String         @id @default(cuid())
+  organizationId      String
+  briefId             String?
+  sourceId            String?
+  name                String
+  description         String?        @db.Text
+  diagramData         Json?          // React Flow nodes and edges
+  status              String         @default("MAPPED") // MAPPED | OPTIMIZED | AGENT_ENABLED
+  automatabilityScore Float?         @default(0) // 0-100
+  businessImpactHours Float?         @default(0) // hours/week saved
+  impactAssumptions   String?        @db.Text
+  riskScore           Float?         @default(0) // 0-100
+  riskSummary         String?        @db.Text
+  agentFit            String?        @default("HUMAN_IN_THE_LOOP") // RULE_BASED | LLM_AGENT | HUMAN_IN_THE_LOOP
+  opportunitySummary  Json?
+  tokenUsage          Json?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  brief        Brief?         @relation(fields: [briefId], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brief        Brief?          @relation(fields: [briefId], references: [id], onDelete: SetNull)
+  source       WorkflowSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   steps        WorkflowStep[]
 
   @@index([organizationId])
+  @@index([briefId])
 }
 
 model WorkflowStep {
@@ -605,9 +637,20 @@ model WorkflowStep {
   description            String?  @db.Text
   tool                   String?
   actor                  String   @default("HUMAN") // HUMAN | AGENT | HYBRID
+  input                  String?  @db.Text
+  output                 String?  @db.Text
+  durationMinutes        Float?   @default(0)
+  decisionPoints         String?  @db.Text
+  failureModes           String?  @db.Text
+  automatabilityPct      Float?   @default(0)
+  hoursSavedWeekly       Float?   @default(0)
+  riskLevel              String?  @default("LOW") // LOW | MEDIUM | HIGH
+  agentFit               String?  @default("HUMAN_IN_THE_LOOP") // RULE_BASED | LLM_AGENT | HUMAN_IN_THE_LOOP
   estimatedHoursPerMonth Float?
   automationPotentialPct Float?
   canBeAutonomous        Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
