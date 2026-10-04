@@ -8,103 +8,117 @@ import {
   TooltipProvider,
 } from "./tooltip";
 
-// Recognized tool definitions with distinct brand colors and icons/glyphs
+// Recognized tool definitions with authentic brand colors and clean metadata
 const TOOL_DEFINITIONS = {
   n8n: {
     name: "n8n",
-    glyph: "n8",
-    bg: "bg-[#EA4B71]/15",
-    text: "text-[#EA4B71]",
-    border: "border-[#EA4B71]/30",
+    dot: "#EA4B71",
+    bg: "bg-[#EA4B71]/8",
+    border: "border-[#EA4B71]/25",
   },
   make: {
     name: "Make",
-    glyph: "M",
-    bg: "bg-[#6D3FF3]/15",
-    text: "text-[#6D3FF3]",
-    border: "border-[#6D3FF3]/30",
+    dot: "#6D3FF3",
+    bg: "bg-[#6D3FF3]/8",
+    border: "border-[#6D3FF3]/25",
   },
   zapier: {
     name: "Zapier",
-    glyph: "_*",
-    bg: "bg-[#FF4A00]/15",
-    text: "text-[#FF4A00]",
-    border: "border-[#FF4A00]/30",
+    dot: "#FF4A00",
+    bg: "bg-[#FF4A00]/8",
+    border: "border-[#FF4A00]/25",
   },
   langgraph: {
     name: "LangGraph",
-    glyph: "LG",
-    bg: "bg-[#4B3FD6]/15",
-    text: "text-[#4B3FD6]",
-    border: "border-[#4B3FD6]/30",
+    dot: "#4B3FD6",
+    bg: "bg-[#4B3FD6]/8",
+    border: "border-[#4B3FD6]/25",
   },
   claude: {
     name: "Claude",
-    glyph: "C",
-    bg: "bg-[#D97706]/15",
-    text: "text-[#D97706]",
-    border: "border-[#D97706]/30",
+    dot: "#D97706",
+    bg: "bg-[#D97706]/8",
+    border: "border-[#D97706]/25",
   },
   openai: {
     name: "OpenAI",
-    glyph: "AI",
-    bg: "bg-[#10A37F]/15",
-    text: "text-[#10A37F]",
-    border: "border-[#10A37F]/30",
+    dot: "#10A37F",
+    bg: "bg-[#10A37F]/8",
+    border: "border-[#10A37F]/25",
   },
   hubspot: {
     name: "HubSpot",
-    glyph: "HS",
-    bg: "bg-[#FF7A59]/15",
-    text: "text-[#FF7A59]",
-    border: "border-[#FF7A59]/30",
+    dot: "#FF7A59",
+    bg: "bg-[#FF7A59]/8",
+    border: "border-[#FF7A59]/25",
   },
   salesforce: {
     name: "Salesforce",
-    glyph: "SF",
-    bg: "bg-[#00A1E0]/15",
-    text: "text-[#00A1E0]",
-    border: "border-[#00A1E0]/30",
+    dot: "#00A1E0",
+    bg: "bg-[#00A1E0]/8",
+    border: "border-[#00A1E0]/25",
   },
   slack: {
     name: "Slack",
-    glyph: "#",
-    bg: "bg-[#4A154B]/15",
-    text: "text-[#E01E5A]",
-    border: "border-[#E01E5A]/30",
+    dot: "#E01E5A",
+    bg: "bg-[#E01E5A]/8",
+    border: "border-[#E01E5A]/25",
   },
   postgres: {
     name: "PostgreSQL",
-    glyph: "PG",
-    bg: "bg-[#336791]/15",
-    text: "text-[#336791]",
-    border: "border-[#336791]/30",
+    dot: "#336791",
+    bg: "bg-[#336791]/8",
+    border: "border-[#336791]/25",
+  },
+  postgresql: {
+    name: "PostgreSQL",
+    dot: "#336791",
+    bg: "bg-[#336791]/8",
+    border: "border-[#336791]/25",
   },
   python: {
     name: "Python",
-    glyph: "Py",
-    bg: "bg-[#3776AB]/15",
-    text: "text-[#3776AB]",
-    border: "border-[#3776AB]/30",
+    dot: "#3776AB",
+    bg: "bg-[#3776AB]/8",
+    border: "border-[#3776AB]/25",
   },
   docker: {
     name: "Docker",
-    glyph: "D",
-    bg: "bg-[#2496ED]/15",
-    text: "text-[#2496ED]",
-    border: "border-[#2496ED]/30",
+    dot: "#2496ED",
+    bg: "bg-[#2496ED]/8",
+    border: "border-[#2496ED]/25",
+  },
+  netsuite: {
+    name: "NetSuite",
+    dot: "#1B365D",
+    bg: "bg-[#1B365D]/8",
+    border: "border-[#1B365D]/25",
+  },
+  jira: {
+    name: "Jira",
+    dot: "#0052CC",
+    bg: "bg-[#0052CC]/8",
+    border: "border-[#0052CC]/25",
+  },
+  supabase: {
+    name: "Supabase",
+    dot: "#3ECF8E",
+    bg: "bg-[#3ECF8E]/8",
+    border: "border-[#3ECF8E]/25",
   },
 };
 
 function normalizeToolName(tool = "") {
-  return tool.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(tool)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 export function ToolChip({
   tool,
   onClick = null,
   active = false,
-  size = "md", // "sm" (20px), "md" (24px)
+  size = "sm", // "sm" (compact table pill) | "md" (standard badge)
   className = "",
 }) {
   if (!tool) return null;
@@ -112,38 +126,39 @@ export function ToolChip({
   const key = normalizeToolName(toolStr);
   const def = TOOL_DEFINITIONS[key] || {
     name: toolStr,
-    glyph: toolStr.charAt(0).toUpperCase(),
-    bg: "bg-canvas-2 dark:bg-panel-2",
-    text: "text-ink-2",
-    border: "border-line dark:border-line-2",
+    dot: "#8C877C",
+    bg: "bg-panel-2",
+    border: "border-line",
   };
 
-  const sizeClasses =
-    {
-      sm: "h-5 px-1.5 text-[10px] gap-1",
-      md: "h-6 px-2 text-[11px] gap-1.5",
-    }[size] || "h-6 px-2 text-[11px] gap-1.5";
+  const isSmall = size === "sm";
 
   const chipElement = (
     <button
       type="button"
       onClick={onClick ? () => onClick(def.name) : undefined}
       disabled={!onClick}
-      className={`inline-flex shrink-0 select-none items-center rounded-md border font-medium transition-all ${sizeClasses} ${
-        def.bg
-      } ${def.text} ${def.border} ${
+      className={`inline-flex shrink-0 select-none items-center rounded-full border transition-all ${
+        isSmall ? "h-5 gap-1.5 px-2 text-[11px]" : "h-6 gap-1.5 px-2.5 text-xs"
+      } ${def.border} ${def.bg} bg-panel/90 text-ink shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${
         active
-          ? "shadow-xs font-bold ring-2 ring-brand-indigo ring-offset-1 ring-offset-panel"
-          : ""
+          ? "border-brand-indigo font-semibold ring-2 ring-brand-indigo ring-offset-1 ring-offset-panel"
+          : "hover:border-line-2 hover:bg-panel-2"
       } ${
         onClick
-          ? "hover:scale-102 active:scale-98 cursor-pointer hover:opacity-85"
+          ? "hover:scale-102 active:scale-98 cursor-pointer"
           : "cursor-default"
       } ${className}`}
       aria-label={`Tool: ${def.name}`}
     >
-      <span className="font-mono font-bold tracking-tight">{def.glyph}</span>
-      <span className="max-w-[80px] truncate">{def.name}</span>
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: def.dot }}
+        aria-hidden="true"
+      />
+      <span className="max-w-[90px] truncate font-medium tracking-tight text-ink">
+        {def.name}
+      </span>
     </button>
   );
 
@@ -161,34 +176,53 @@ export function ToolChip({
 
 export function ToolChipRow({
   tools = [],
+  onToolClick = null,
   onSelectTool = null,
   selectedTool = null,
-  limit = 4,
+  limit = 2,
+  max = null,
+  size = "sm",
 }) {
+  const handler = onToolClick || onSelectTool;
+  const effectiveLimit = max !== null ? max : limit;
+
   if (!tools || tools.length === 0) return null;
-  const visible = tools.slice(0, limit);
-  const remaining = tools.length - limit;
+  const visible = tools.slice(0, effectiveLimit);
+  const remaining = tools.slice(effectiveLimit);
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden">
       {visible.map((t, idx) => {
         const tName = typeof t === "string" ? t : t.name;
         return (
           <ToolChip
             key={`${tName}-${idx}`}
             tool={t}
+            size={size}
             active={
               selectedTool &&
               normalizeToolName(selectedTool) === normalizeToolName(tName)
             }
-            onClick={onSelectTool}
+            onClick={handler}
           />
         );
       })}
-      {remaining > 0 && (
-        <span className="rounded border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[10px] text-ink-3">
-          +{remaining}
-        </span>
+
+      {remaining.length > 0 && (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex h-5 shrink-0 cursor-default select-none items-center rounded-full border border-line bg-panel-2 px-1.5 text-[10px] font-medium text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-colors hover:border-line-2 hover:text-ink">
+                +{remaining.length}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-2xs font-medium">
+              {remaining
+                .map((r) => (typeof r === "string" ? r : r.name))
+                .join(", ")}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   );

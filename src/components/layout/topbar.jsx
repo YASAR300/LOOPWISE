@@ -16,6 +16,7 @@ import {
   Sun,
   Moon,
   Sparkles,
+  PanelLeft,
 } from "lucide-react";
 import { useTheme } from "@/components/layout/theme-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -114,6 +115,18 @@ export function Topbar({ currentUser = null, breadcrumbs = [] }) {
         >
           <Logo href={null} markClassName="h-6 w-6" textClassName="text-base" />
         </Link>
+
+        <button
+          type="button"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("toggle-sidebar"));
+          }}
+          className="ml-1 hidden h-7 w-7 items-center justify-center rounded-lg border border-line text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink md:flex"
+          title="Toggle sidebar ([)"
+          aria-label="Toggle sidebar"
+        >
+          <PanelLeft className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {/* Center: Global Search Bar */}

@@ -144,14 +144,14 @@ export function DataTable({
                 />
               </th>
             )}
-            <th className="min-w-[160px] px-3 text-xs font-medium text-ink-3">
+            <th className="min-w-[180px] px-3 text-xs font-medium text-ink-3 md:min-w-[220px]">
               Agent / Item
             </th>
-            <th className="min-w-[200px] px-3 text-xs font-medium text-ink-3">
+            <th className="min-w-[220px] px-3 text-xs font-medium text-ink-3">
               Description
             </th>
-            <th className="w-32 px-3 text-xs font-medium text-ink-3">Date</th>
-            <th className="w-36 px-3 text-xs font-medium text-ink-3">
+            <th className="w-28 px-3 text-xs font-medium text-ink-3">Date</th>
+            <th className="w-44 px-3 text-xs font-medium text-ink-3">
               Apps used
             </th>
             <th className="w-28 px-3 text-xs font-medium text-ink-3">Status</th>
@@ -204,7 +204,7 @@ export function DataTable({
                   isSelected
                     ? "bg-brand-indigo/5 dark:bg-brand-indigo/10"
                     : isFocused
-                      ? "bg-panel-2 ring-1 ring-inset ring-brand-indigo/30"
+                      ? "ring-brand-indigo/30 bg-panel-2 ring-1 ring-inset"
                       : "hover:bg-panel-2"
                 }`}
               >
@@ -229,21 +229,21 @@ export function DataTable({
                 )}
 
                 {/* Identity Tile + Name */}
-                <td className="min-w-[160px] px-3">
+                <td className="min-w-[180px] px-3 md:min-w-[220px]">
                   <div className="flex items-center gap-2.5">
                     <IdentityTile
                       name={item.name || item.title}
                       id={item.id}
                       size="sm"
                     />
-                    <span className="max-w-[180px] truncate font-semibold text-ink transition-colors group-hover:text-brand-indigo">
+                    <span className="max-w-[200px] truncate font-semibold text-ink transition-colors group-hover:text-brand-indigo md:max-w-[260px]">
                       {item.name || item.title}
                     </span>
                   </div>
                 </td>
 
                 {/* Description */}
-                <td className="min-w-[200px] px-3 text-ink-2">
+                <td className="min-w-[220px] px-3 text-ink-2">
                   <span className="line-clamp-1 text-xs">
                     {item.description || "—"}
                   </span>
@@ -263,7 +263,8 @@ export function DataTable({
                     tools={item.tools || item.apps || []}
                     onToolClick={onToolClick}
                     size="sm"
-                    max={3}
+                    limit={2}
+                    max={2}
                   />
                 </td>
 

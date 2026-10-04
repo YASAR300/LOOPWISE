@@ -27,6 +27,8 @@ import {
   ChevronDown,
   LogOut,
   Sparkles,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { IdentityTile } from "@/components/ui/identity-tile";
 import { PlanUsageMeter } from "./plan-usage-meter";
@@ -110,6 +112,15 @@ export function Sidebar({ initialCollapsed = false, currentUser = null }) {
     Cookies.set(SIDEBAR_COOKIE, String(next), { expires: 365, path: "/" });
   };
 
+  useEffect(() => {
+    const handleToggleEvent = () => {
+      toggleCollapsed();
+    };
+    window.addEventListener("toggle-sidebar", handleToggleEvent);
+    return () =>
+      window.removeEventListener("toggle-sidebar", handleToggleEvent);
+  }, [collapsed]);
+
   const createActionHref =
     role === "CLIENT"
       ? "/client/briefs/new"
@@ -131,29 +142,68 @@ export function Sidebar({ initialCollapsed = false, currentUser = null }) {
           collapsed ? "w-14 items-center" : "w-60"
         }`}
       >
-        {/* Top Header / Create Action */}
-        <div className="flex w-full items-center justify-between gap-2 border-b border-line p-3">
+        {/* Top Header / Create Action + Collapse Button */}
+        <div
+          className={`flex w-full items-center border-b border-line p-3 ${
+            collapsed ? "flex-col gap-2 px-2" : "justify-between gap-2"
+          }`}
+        >
           {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  href={createActionHref}
-                  className="shadow-xs flex h-9 w-9 items-center justify-center rounded-lg bg-brand-accent text-white transition-transform hover:bg-brand-accent-hover active:scale-95"
-                  aria-label={createActionLabel}
-                >
-                  <Plus className="h-4 w-4" />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">{createActionLabel}</TooltipContent>
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={createActionHref}
+                    className="shadow-xs flex h-9 w-9 items-center justify-center rounded-lg bg-brand-accent text-white transition-transform hover:bg-brand-accent-hover active:scale-95"
+                    aria-label={createActionLabel}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {createActionLabel}
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={toggleCollapsed}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+                    aria-label="Expand sidebar ([)"
+                  >
+                    <PanelLeftOpen className="h-4 w-4 text-brand-indigo" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expand sidebar ([)</TooltipContent>
+              </Tooltip>
+            </>
           ) : (
-            <Link
-              href={createActionHref}
-              className="btn-primary-orange shadow-xs flex w-full items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>{createActionLabel}</span>
-            </Link>
+            <>
+              <Link
+                href={createActionHref}
+                className="btn-primary-orange shadow-xs flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>{createActionLabel}</span>
+              </Link>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={toggleCollapsed}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+                    aria-label="Collapse sidebar ([)"
+                  >
+                    <PanelLeftClose className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  Collapse sidebar ([)
+                </TooltipContent>
+              </Tooltip>
+            </>
           )}
         </div>
 
@@ -330,7 +380,7 @@ export function Sidebar({ initialCollapsed = false, currentUser = null }) {
                 )}
               </div>
 
-              {!collapsed && (
+              {!collapsed ? (
                 <button
                   type="button"
                   onClick={toggleCollapsed}
@@ -341,6 +391,22 @@ export function Sidebar({ initialCollapsed = false, currentUser = null }) {
                     [
                   </kbd>
                 </button>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={toggleCollapsed}
+                      aria-label="Expand sidebar ([)"
+                      className="rounded p-1 text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+                    >
+                      <PanelLeftOpen className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Expand sidebar ([)
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
           </div>
