@@ -30,105 +30,133 @@ export async function GET() {
 
     const orgId = membership.organizationId;
 
-    // 1. Active Briefs
-    const briefs = await db.brief.findMany({
-      where: {
-        organizationId: orgId,
-        deletedAt: null,
-      },
-      include: {
-        workflows: {
-          select: {
-            id: true,
-            name: true,
-            automatabilityScore: true,
-            businessImpactHours: true,
+    // Use Promise.allSettled so no single query failure crashes the entire dashboard
+    const [
+      briefsRes,
+      shortlistsRes,
+      proposalsRes,
+      engagementsRes,
+      unreadRes,
+      activityRes,
+      orgRes,
+    ] = await Promise.allSettled([
+      // 1. Active Briefs
+      db.brief.findMany({
+        where: {
+          organizationId: orgId,
+          deletedAt: null,
+        },
+        include: {
+          workflows: {
+            select: {
+              id: true,
+              name: true,
+              automatabilityScore: true,
+              businessImpactHours: true,
+            },
+          },
+          jobs: {
+            select: { id: true, title: true, status: true },
           },
         },
-        jobs: {
-          select: { id: true, title: true, status: true },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 6,
-    });
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+      }),
 
-    // 2. Shortlists
-    const shortlists = await db.shortlist.findMany({
-      where: { organizationId: orgId },
-      include: {
-        items: {
-          include: {
-            strategistProfile: {
-              include: {
-                user: { select: { name: true, image: true, email: true } },
+      // 2. Shortlists
+      db.shortlist.findMany({
+        where: { organizationId: orgId },
+        include: {
+          items: {
+            include: {
+              strategistProfile: {
+                include: {
+                  user: { select: { name: true, image: true, email: true } },
+                },
               },
             },
           },
         },
-      },
-      take: 5,
-    });
+        take: 5,
+      }),
 
-    // 3. Pending Proposals
-    const proposals = await db.proposal.findMany({
-      where: {
-        job: { organizationId: orgId },
-        status: { in: ["SUBMITTED", "SHORTLISTED"] },
-      },
-      include: {
-        job: { select: { id: true, title: true } },
-        strategistProfile: {
-          include: {
-            user: { select: { name: true, image: true } },
+      // 3. Pending Proposals
+      db.proposal.findMany({
+        where: {
+          OR: [
+            { job: { organizationId: orgId } },
+            { brief: { organizationId: orgId } },
+          ],
+          status: { in: ["SENT", "VIEWED", "SHORTLISTED", "SUBMITTED"] },
+        },
+        include: {
+          job: { select: { id: true, title: true } },
+          brief: { select: { id: true, title: true } },
+          strategistProfile: {
+            include: {
+              user: { select: { name: true, image: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    });
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
 
-    // 4. Active Engagements
-    const engagements = await db.engagement.findMany({
-      where: {
-        organizationId: orgId,
-        status: { in: ["PENDING", "ACTIVE"] },
-      },
-      include: {
-        strategistProfile: {
-          include: {
-            user: { select: { name: true, image: true } },
-          },
+      // 4. Active Engagements
+      db.engagement.findMany({
+        where: {
+          organizationId: orgId,
+          status: { in: ["PENDING", "ACTIVE"] },
         },
-        milestones: true,
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 5,
-    });
+        include: {
+          strategistProfile: {
+            include: {
+              user: { select: { name: true, image: true } },
+            },
+          },
+          milestones: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+      }),
 
-    // 5. Unread Messages count
-    const unreadMessagesCount = await db.notification.count({
-      where: {
-        userId: user.id,
-        type: "MESSAGE",
-        read: false,
-      },
-    });
+      // 5. Unread Messages count
+      db.notification.count({
+        where: {
+          userId: user.id,
+          type: "MESSAGE",
+          read: false,
+        },
+      }),
 
-    // 6. Recent Activity Feed from ActivityEvent & AuditLog
-    const activityEvents = await db.activityEvent.findMany({
-      where: {
-        engagement: { organizationId: orgId },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    });
+      // 6. Recent Activity Feed
+      db.activityEvent.findMany({
+        where: {
+          engagement: { organizationId: orgId },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
 
-    // 7. AI Quota
-    const org = await db.organization.findUnique({
-      where: { id: orgId },
-      select: { aiAnalysisQuota: true, aiAnalysisUsed: true },
-    });
+      // 7. AI Quota
+      db.organization.findUnique({
+        where: { id: orgId },
+        select: { aiAnalysisQuota: true, aiAnalysisUsed: true },
+      }),
+    ]);
+
+    const briefs = briefsRes.status === "fulfilled" ? briefsRes.value : [];
+    const shortlists =
+      shortlistsRes.status === "fulfilled" ? shortlistsRes.value : [];
+    const proposals =
+      proposalsRes.status === "fulfilled" ? proposalsRes.value : [];
+    const engagements =
+      engagementsRes.status === "fulfilled" ? engagementsRes.value : [];
+    const unreadMessagesCount =
+      unreadRes.status === "fulfilled" ? unreadRes.value : 0;
+    const activityFeed =
+      activityRes.status === "fulfilled" ? activityRes.value : [];
+    const org = orgRes.status === "fulfilled" ? orgRes.value : null;
 
     const quota = {
       quota: org?.aiAnalysisQuota || 50,
@@ -148,11 +176,24 @@ export async function GET() {
       proposals,
       engagements,
       unreadMessagesCount,
-      activityFeed: activityEvents,
+      activityFeed,
       quota,
     });
   } catch (error) {
     console.error("[Client Dashboard GET Error]:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        hasOrg: false,
+        briefs: [],
+        shortlists: [],
+        proposals: [],
+        engagements: [],
+        unreadMessagesCount: 0,
+        activityFeed: [],
+        quota: { quota: 50, used: 0, remaining: 50 },
+        error: error.message,
+      },
+      { status: 200 }
+    );
   }
 }

@@ -9,24 +9,30 @@ import { writeAuditLog } from "@/lib/audit";
  * Returns null if not authenticated.
  */
 export async function getCurrentUser() {
-  const supabase = await createClient();
-  const {
-    data: { user: supabaseUser },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user: supabaseUser },
+      error,
+    } = await supabase.auth.getUser();
 
-  if (!supabaseUser) return null;
+    if (error || !supabaseUser) return null;
 
-  const user = await db.user.findUnique({
-    where: { email: supabaseUser.email, deletedAt: null },
-    include: {
-      memberships: {
-        include: { organization: true },
+    const user = await db.user.findUnique({
+      where: { email: supabaseUser.email, deletedAt: null },
+      include: {
+        memberships: {
+          include: { organization: true },
+        },
+        notificationPreference: true,
       },
-      notificationPreference: true,
-    },
-  });
+    });
 
-  return user;
+    return user;
+  } catch (err) {
+    console.error("[getCurrentUser] Error:", err);
+    return null;
+  }
 }
 
 /**

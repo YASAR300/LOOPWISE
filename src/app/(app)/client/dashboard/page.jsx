@@ -208,8 +208,14 @@ export default function ClientDashboardPage() {
                       </p>
                       <div className="text-ink-4 flex items-center gap-3 pt-1 text-2xs">
                         <span>
-                          Budget: ${brief.budgetMin?.toLocaleString()} - $
-                          {brief.budgetMax?.toLocaleString()}
+                          Budget:{" "}
+                          {brief.budgetMin
+                            ? `$${brief.budgetMin.toLocaleString()}`
+                            : "$0"}{" "}
+                          -{" "}
+                          {brief.budgetMax
+                            ? `$${brief.budgetMax.toLocaleString()}`
+                            : "Flexible"}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1 font-semibold text-brand-indigo">
@@ -268,10 +274,13 @@ export default function ClientDashboardPage() {
                       </div>
                       <div>
                         <div className="text-xs font-bold text-ink">
-                          {prop.strategistProfile?.user?.name}
+                          {prop.strategistProfile?.user?.name || "Strategist"}
                         </div>
                         <div className="text-2xs text-ink-3">
-                          Proposed: ${prop.proposedRate}/mo • {prop.job?.title}
+                          Proposed: ${prop.proposedRate}/mo •{" "}
+                          {prop.job?.title ||
+                            prop.brief?.title ||
+                            "Strategic Automation"}
                         </div>
                       </div>
                     </div>
@@ -318,7 +327,9 @@ export default function ClientDashboardPage() {
                       {act.title}
                     </p>
                     <span className="text-ink-4 text-2xs">
-                      {new Date(act.createdAt).toLocaleDateString()}
+                      {act.createdAt
+                        ? new Date(act.createdAt).toLocaleDateString()
+                        : "Recent"}
                     </span>
                   </div>
                 ))}
