@@ -1,134 +1,304 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Briefcase, Plus } from "lucide-react";
-import { FilterRow } from "@/components/ui/filter-row";
-import { GroupedSection } from "@/components/ui/grouped-section";
-import { DataTable } from "@/components/ui/data-table";
-
-const INITIAL_ENGAGEMENTS = [
-  {
-    id: "eng-1",
-    name: "Apex Logistics AI Orchestration",
-    description:
-      "Elena Rostova leading 15h/wk fractional automation. Milestone 2 in progress: automated carrier dispatch.",
-    date: "Milestone due Oct 15",
-    tools: ["LangGraph", "Python", "Slack"],
-    status: "in-progress",
-    href: "/client/engagements/eng-1",
-  },
-  {
-    id: "eng-2",
-    name: "CloudScale Inbound Lead Routing",
-    description:
-      "Marcus Vance deployed high-intent lead enrichment with instant HubSpot to Slack alerts.",
-    date: "Active retainer",
-    tools: ["HubSpot", "Make", "Claude"],
-    status: "complete",
-    href: "/client/engagements/eng-2",
-  },
-  {
-    id: "eng-3",
-    name: "Accounts Payable Triage Automation",
-    description:
-      "Milestone 3 completed. Client sign-off and escrow payment approval needed.",
-    date: "Needs approval",
-    tools: ["n8n", "OpenAI", "Postgres"],
-    status: "needs-action",
-    href: "/client/engagements/eng-3",
-  },
-];
+import {
+  Briefcase,
+  Plus,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  FileCheck2,
+  Layers,
+  ChevronRight,
+  RefreshCw,
+  Search,
+  Filter,
+  DollarSign,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 export default function ClientEngagementsPage() {
-  const [engagements, setEngagements] = useState(INITIAL_ENGAGEMENTS);
+  const [engagements, setEngagements] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [density, setDensity] = useState("comfortable");
-  const [activeView, setActiveView] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [actionCount, setActionCount] = useState(0);
+
+  const fetchEngagements = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/client/engagements?status=${statusFilter}`);
+      if (!res.ok) throw new Error("Failed to fetch engagements");
+      const data = await res.json();
+      setEngagements(data.engagements || []);
+      setActionCount(data.actionCount || 0);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEngagements();
+  }, [statusFilter]);
 
   const filtered = useMemo(() => {
     return engagements.filter((item) => {
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const matchesName = item.name.toLowerCase().includes(q);
-        const matchesDesc = item.description.toLowerCase().includes(q);
-        if (!matchesName && !matchesDesc) return false;
-      }
-      if (statusFilter !== "all" && item.status !== statusFilter) return false;
-      if (activeView === "needs-action" && item.status !== "needs-action")
-        return false;
-      return true;
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      const matchesTitle = item.title.toLowerCase().includes(q);
+      const matchesStrategist = item.strategistProfile?.user?.name
+        ?.toLowerCase()
+        .includes(q);
+      return matchesTitle || matchesStrategist;
     });
-  }, [engagements, search, statusFilter, activeView]);
+  }, [engagements, search]);
 
-  const needsAction = filtered.filter((e) => e.status === "needs-action");
-  const allOther = filtered.filter((e) => e.status !== "needs-action");
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case "ACTIVE":
+        return (
+          <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+            Active
+          </Badge>
+        );
+      case "PAUSED":
+        return (
+          <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-400">
+            Paused
+          </Badge>
+        );
+      case "COMPLETED":
+        return (
+          <Badge className="border-blue-500/30 bg-blue-500/10 text-blue-400">
+            Completed
+          </Badge>
+        );
+      case "TERMINATED":
+        return (
+          <Badge className="border-rose-500/30 bg-rose-500/10 text-rose-400">
+            Terminated
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-16">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-line pb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-brand-indigo/20 bg-brand-indigo/10 text-brand-indigo">
-            <Briefcase className="h-5 w-5" />
+      <div className="border-border/60 flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3.5">
+          <div className="border-primary/20 bg-primary/10 flex h-12 w-12 items-center justify-center rounded-2xl border text-primary shadow-sm">
+            <Briefcase className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-ink">
-              Active Engagements
-            </h1>
-            <p className="text-xs text-ink-3">
-              Contracts, escrow milestones, and assigned Fractional Heads of AI
+            <div className="flex items-center gap-2">
+              <h1 className="text-foreground text-2xl font-bold tracking-tight">
+                Client Engagements
+              </h1>
+              {actionCount > 0 && (
+                <Badge className="border-amber-500/40 bg-amber-500/20 text-xs text-amber-300">
+                  {actionCount} action needed
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Workspaces, deliverables kanban, cadence updates, and time
+              approvals for your fractional leaders.
             </p>
           </div>
         </div>
 
-        <Link
-          href="/client/briefs/new"
-          className="btn-primary-indigo shadow-xs flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New engagement</span>
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchEngagements}
+            disabled={loading}
+            className="h-9 w-9 p-0"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${loading ? "animate-spin text-primary" : ""}`}
+            />
+          </Button>
+
+          <Button
+            asChild
+            className="text-primary-foreground gap-2 bg-primary shadow-sm"
+          >
+            <Link href="/client/briefs/new">
+              <Plus className="h-4 w-4" />
+              <span>New Brief / Hire</span>
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Filter Row */}
-      <FilterRow
-        search={search}
-        onSearchChange={setSearch}
-        status={statusFilter}
-        onStatusChange={setStatusFilter}
-        statusOptions={[
-          { value: "all", label: "Any status" },
-          { value: "needs-action", label: "Needs action" },
-          { value: "in-progress", label: "In progress" },
-          { value: "complete", label: "Complete" },
-        ]}
-        savedViews={[
-          { id: "all", label: "All contracts", count: engagements.length },
-          { id: "needs-action", label: "Needs action", count: 1 },
-        ]}
-        activeView={activeView}
-        onViewChange={setActiveView}
-        density={density}
-        onDensityChange={setDensity}
-        placeholder="Filter engagements..."
-      />
+      {/* Filter and Search Bar */}
+      <div className="bg-card/40 border-border/50 flex flex-col items-center justify-between gap-3 rounded-xl border p-3 sm:flex-row">
+        <div className="relative w-full sm:w-80">
+          <Search className="text-muted-foreground absolute left-3 top-2.5 h-4 w-4" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title or strategist..."
+            className="bg-background/60 h-9 pl-9"
+          />
+        </div>
 
-      {/* Grouped Section: Needs Action */}
-      {needsAction.length > 0 && (
-        <GroupedSection title="Needs action" count={needsAction.length}>
-          <DataTable data={needsAction} density={density} />
-        </GroupedSection>
+        <div className="flex w-full items-center gap-1.5 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
+          <Filter className="text-muted-foreground mr-1 h-4 w-4 shrink-0" />
+          {[
+            { id: "ALL", label: "All Engagements" },
+            { id: "ACTIVE", label: "Active" },
+            { id: "PAUSED", label: "Paused" },
+            { id: "COMPLETED", label: "Completed" },
+          ].map((status) => (
+            <button
+              key={status.id}
+              onClick={() => setStatusFilter(status.id)}
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === status.id
+                  ? "text-primary-foreground bg-primary"
+                  : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
+              }`}
+            >
+              {status.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Engagements List */}
+      {loading ? (
+        <div className="p-16 text-center">
+          <RefreshCw className="mx-auto mb-3 h-7 w-7 animate-spin text-primary" />
+          <p className="text-muted-foreground font-mono text-xs">
+            Loading active engagements...
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="border-border/80 bg-card/20 space-y-4 rounded-2xl border border-dashed p-12 text-center">
+          <Briefcase className="text-muted-foreground/40 mx-auto h-10 w-10" />
+          <div>
+            <h3 className="text-foreground text-sm font-semibold">
+              No engagements found
+            </h3>
+            <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-xs">
+              {statusFilter !== "ALL"
+                ? `No engagements currently in ${statusFilter} state.`
+                : "Accept a proposal or create a direct hire contract to launch your first engagement."}
+            </p>
+          </div>
+          <Button asChild size="sm" variant="outline" className="gap-2">
+            <Link href="/client/proposals">
+              <FileCheck2 className="h-4 w-4" />
+              View Received Proposals
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((eng) => {
+            const hasAction = eng.itemsNeedingAction > 0;
+            return (
+              <div
+                key={eng.id}
+                className={`bg-card/60 hover:bg-card/90 relative rounded-2xl border p-5 shadow-sm transition-all duration-200 ${
+                  hasAction
+                    ? "border-amber-500/40 ring-1 ring-amber-500/20"
+                    : "border-border/60 hover:border-border"
+                }`}
+              >
+                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-muted-foreground bg-muted/40 rounded px-2 py-0.5 font-mono text-[11px] uppercase">
+                        {eng.model}
+                      </span>
+                      <h3 className="text-foreground text-base font-bold">
+                        {eng.title}
+                      </h3>
+                      {getStatusBadge(eng.status)}
+                    </div>
+
+                    <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-xs">
+                      <span>
+                        Strategist:{" "}
+                        <strong className="text-foreground">
+                          {eng.strategistProfile?.user?.name ||
+                            "Vetted Strategist"}
+                        </strong>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Rate:{" "}
+                        <strong className="text-foreground">
+                          ${eng.rate?.toLocaleString()}{" "}
+                          {eng.model === "RETAINER" ? "/mo" : "/hr"}
+                        </strong>
+                      </span>
+                      {eng.model === "HOURLY" && (
+                        <>
+                          <span>•</span>
+                          <span>
+                            Logged this week:{" "}
+                            <strong className="text-foreground">
+                              {eng.hoursThisWeek || 0}h /{" "}
+                              {eng.hourlyWeeklyCap || 20}h
+                            </strong>
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Action required tags */}
+                    {hasAction && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {eng.needsContractSig && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                            <FileCheck2 className="h-3 w-3" /> Signature Needed
+                          </span>
+                        )}
+                        {eng.pendingDeliverables > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-300">
+                            <Layers className="h-3 w-3" />{" "}
+                            {eng.pendingDeliverables} Deliverable In Review
+                          </span>
+                        )}
+                        {eng.unacknowledgedUpdate && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-300">
+                            <Clock className="h-3 w-3" /> Weekly Cadence
+                            Awaiting Reaction
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Button
+                      asChild
+                      className="text-primary-foreground h-9 gap-2 bg-primary px-4 text-xs font-semibold"
+                    >
+                      <Link href={`/client/engagements/${eng.id}`}>
+                        Open Workspace
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
-
-      {/* Grouped Section: All Activity */}
-      <GroupedSection
-        title={needsAction.length > 0 ? "All engagements" : "Active contracts"}
-        count={allOther.length}
-      >
-        <DataTable data={allOther} density={density} />
-      </GroupedSection>
     </div>
   );
 }

@@ -89,6 +89,22 @@ export function Sidebar({ initialCollapsed = false, currentUser = null }) {
 
   const role = currentUser?.role || "CLIENT";
   const navItems = ROLE_NAV[role] || ROLE_NAV.CLIENT;
+  const [engagementActionCount, setEngagementActionCount] = useState(0);
+
+  useEffect(() => {
+    if (role === "CLIENT" || role === "STRATEGIST") {
+      const endpoint =
+        role === "CLIENT"
+          ? "/api/client/engagements"
+          : "/api/strategist/engagements";
+      fetch(endpoint)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.actionCount) setEngagementActionCount(data.actionCount);
+        })
+        .catch(() => {});
+    }
+  }, [role, pathname]);
 
   // Toggle on "[" key press
   useEffect(() => {
@@ -214,22 +230,33 @@ export function Sidebar({ initialCollapsed = false, currentUser = null }) {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
 
+            const hasActionBadge =
+              item.label === "Engagements" && engagementActionCount > 0;
+
             if (collapsed) {
               return (
                 <Tooltip key={item.href}>
                   <TooltipTrigger asChild>
                     <Link
                       href={item.href}
-                      className={`mx-auto flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+                      className={`relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
                         isActive
                           ? "bg-brand-accent-soft font-bold text-brand-accent"
                           : "text-ink-2 hover:bg-panel-2 hover:text-ink"
                       }`}
                     >
                       <Icon className="h-4 w-4" />
+                      {hasActionBadge && (
+                        <span className="absolute right-1.5 top-1.5 h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                      )}
                     </Link>
                   </TooltipTrigger>
-                  <TooltipContent side="right">{item.label}</TooltipContent>
+                  <TooltipContent side="right">
+                    {item.label}{" "}
+                    {hasActionBadge
+                      ? `(${engagementActionCount} needs action)`
+                      : ""}
+                  </TooltipContent>
                 </Tooltip>
               );
             }
@@ -246,6 +273,11 @@ export function Sidebar({ initialCollapsed = false, currentUser = null }) {
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="truncate">{item.label}</span>
+                {hasActionBadge && (
+                  <span className="py-0.2 ml-auto rounded-full border border-amber-500/30 bg-amber-500/20 px-1.5 font-mono text-[10px] font-bold text-amber-500">
+                    {engagementActionCount}
+                  </span>
+                )}
               </Link>
             );
           })}

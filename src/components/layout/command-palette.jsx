@@ -115,10 +115,30 @@ export function CommandPaletteProvider({ children }) {
                     className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
                   >
                     <Briefcase className="mr-2.5 h-3.5 w-3.5 text-ink-3" />
-                    <span>Active Engagements</span>
+                    <span>Active Engagements & Workspaces</span>
                     <span className="ml-auto font-mono text-[10px] text-ink-3">
                       G then E
                     </span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
+                      runCommand(() => router.push("/client/engagements"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Layers className="mr-2.5 h-3.5 w-3.5 text-tile-teal" />
+                    <span>Deliverables Kanban Board</span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
+                      runCommand(() => router.push("/strategist/engagements"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Clock className="mr-2.5 h-3.5 w-3.5 text-amber-500" />
+                    <span>Engagement Timer & Timesheets</span>
                   </Command.Item>
 
                   <Command.Item
