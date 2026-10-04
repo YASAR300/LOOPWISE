@@ -149,6 +149,36 @@ export function CommandPaletteProvider({ children }) {
 
                   <Command.Item
                     onSelect={() =>
+                      runCommand(() => router.push("/client/briefs"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Sparkles className="mr-2.5 h-3.5 w-3.5 text-brand-indigo" />
+                    <span>Find matches for brief…</span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
+                      runCommand(() => router.push("/client/proposals"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Layers className="mr-2.5 h-3.5 w-3.5 text-brand-accent" />
+                    <span>Open proposal…</span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
+                      runCommand(() => router.push("/client/shortlist"))
+                    }
+                    className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
+                  >
+                    <Users className="mr-2.5 h-3.5 w-3.5 text-tile-teal" />
+                    <span>Client Shortlist</span>
+                  </Command.Item>
+
+                  <Command.Item
+                    onSelect={() =>
                       runCommand(() => router.push("/strategists"))
                     }
                     className="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs text-ink aria-selected:bg-panel-2 aria-selected:text-brand-indigo"
