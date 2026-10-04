@@ -1,6 +1,21 @@
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 let openaiClient = null;
+let anthropicClient = null;
+
+export function getAnthropicClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "ANTHROPIC_API_KEY is not configured. Please add ANTHROPIC_API_KEY to your environment variables (.env.local) to enable workflow analysis."
+    );
+  }
+  if (!anthropicClient) {
+    anthropicClient = new Anthropic({ apiKey });
+  }
+  return anthropicClient;
+}
 
 export function getAIClient() {
   const apiKey = process.env.GROQ_API_KEY;
@@ -115,5 +130,77 @@ export async function generateJSON({ system, user, schema }) {
 
     const retryRaw = await fetchCompletion(retryMessages);
     return parseAndValidate(retryRaw);
+  }
+}
+
+/**
+ * Generate structured JSON completion with Anthropic Claude and validate with Zod schema.
+ * Automatically retries once if invalid JSON or schema validation fails.
+ * Captures token usage and raw response for audit.
+ * @param {Object} options
+ * @param {string} [options.system] - System prompt
+ * @param {string} options.user - User prompt
+ * @param {import("zod").ZodSchema} [options.schema] - Zod schema to validate against
+ * @param {string} [options.model] - Model name
+ * @returns {Promise<{ data: any, usage: { inputTokens: number, outputTokens: number }, raw: string }>}
+ */
+export async function generateAnthropicJSON({
+  system,
+  user,
+  schema,
+  model = "claude-3-5-sonnet-20241022",
+}) {
+  const client = getAnthropicClient();
+  const systemPrompt = system
+    ? `${system}\n\nIMPORTANT: You must output ONLY a valid JSON object. Do not include markdown code block formatting, backticks, explanatory text, or preamble.`
+    : "IMPORTANT: You must output ONLY a valid JSON object. Do not include markdown code block formatting, backticks, explanatory text, or preamble.";
+
+  const runCompletion = async (promptText) => {
+    const response = await client.messages.create({
+      model: process.env.ANTHROPIC_MODEL || model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: "user", content: promptText }],
+    });
+
+    const content = response.content?.[0]?.text || "{}";
+    const usage = {
+      inputTokens: response.usage?.input_tokens || 0,
+      outputTokens: response.usage?.output_tokens || 0,
+    };
+    return { content, usage };
+  };
+
+  const parseAndValidate = (text) => {
+    let cleaned = text.trim();
+    if (cleaned.startsWith("```json")) {
+      cleaned = cleaned.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+    } else if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/^```\s*/, "").replace(/\s*```$/, "");
+    }
+    const parsed = JSON.parse(cleaned);
+    if (schema) {
+      return schema.parse(parsed);
+    }
+    return parsed;
+  };
+
+  const initial = await runCompletion(user);
+  try {
+    const validated = parseAndValidate(initial.content);
+    return { data: validated, usage: initial.usage, raw: initial.content };
+  } catch (err) {
+    // Retry once with error feedback
+    const retryUserPrompt = `${user}\n\nYour previous response failed validation with error: ${err.message}. Please return valid JSON matching the exact schema.`;
+    const retry = await runCompletion(retryUserPrompt);
+    const validated = parseAndValidate(retry.content);
+    return {
+      data: validated,
+      usage: {
+        inputTokens: initial.usage.inputTokens + retry.usage.inputTokens,
+        outputTokens: initial.usage.outputTokens + retry.usage.outputTokens,
+      },
+      raw: retry.content,
+    };
   }
 }
