@@ -73,10 +73,14 @@ enum EngagementModel {
 
 enum MilestoneStatus {
   PENDING
+  FUNDED
+  IN_ESCROW
   IN_PROGRESS
   SUBMITTED
   APPROVED
+  RELEASED
   REJECTED
+  DISPUTED
 }
 
 enum DeliverableStatus {
@@ -92,6 +96,7 @@ enum InvoiceStatus {
   PAID
   VOID
   UNCOLLECTIBLE
+  REFUNDED
 }
 
 enum LedgerDirection {
@@ -111,6 +116,8 @@ enum DisputeStatus {
   UNDER_REVIEW
   RESOLVED_CLIENT
   RESOLVED_STRATEGIST
+  RESOLVED_SPLIT
+  DISMISSED
 }
 
 enum MeetingStatus {
@@ -261,6 +268,11 @@ model Organization {
   billingContactName  String?
   billingContactEmail String?
   billingAddress      String?
+  stripeCustomerId    String?
+  defaultPaymentMethodId String?
+  cardBrand           String?
+  cardLast4           String?
+  taxId               String?
   aiAnalysisQuota     Int                @default(50)
   aiAnalysisUsed      Int                @default(0)
   aiQuotaResetAt      DateTime?
@@ -339,6 +351,8 @@ model StrategistProfile {
   phone                   String?
   stripeAccountId         String?
   stripeOnboarded         Boolean          @default(false)
+  stripeAccountStatus     String?          @default("NOT_CONNECTED") // NOT_CONNECTED | PENDING | ACTIVE
+  taxId                   String?
   yearsExperience         Int?
   hourlyRateMin           Float?
   hourlyRateMax           Float?
@@ -893,6 +907,8 @@ model Engagement {
   endReason           String?          @db.Text
   endFeedback         String?          @db.Text
   closedAt            DateTime?
+  escrowBalance       Float            @default(0)
+  prepaidHoursBalance Float            @default(0)
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   deletedAt           DateTime?
@@ -992,12 +1008,20 @@ model Milestone {
   description  String?         @db.Text
   amount       Float
   dueDate      DateTime?
-  status       MilestoneStatus @default(PENDING)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  status          MilestoneStatus @default(PENDING)
+  fundedAt        DateTime?
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  releasedAt      DateTime?
+  autoReleaseAt   DateTime?
+  workNotes       String?         @db.Text
+  workAttachments Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   engagement   Engagement    @relation(fields: [engagementId], references: [id], onDelete: Cascade)
   deliverables Deliverable[]
+  disputes     Dispute[]
 
   @@index([engagementId])
 }
@@ -1136,28 +1160,40 @@ model ActivityEvent {
 // ==============================================================================
 
 model Invoice {
-  id              String        @id @default(cuid())
-  organizationId  String
-  engagementId    String?
-  stripeInvoiceId String?
-  number          String        @unique
-  subtotal        Float
-  platformFee     Float         @default(0)
-  total           Float
-  currency        String        @default("USD")
-  status          InvoiceStatus @default(DRAFT)
-  dueDate         DateTime?
-  paidAt          DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  organizationId        String
+  engagementId          String?
+  stripeInvoiceId       String?
+  stripePaymentIntentId String?
+  number                String        @unique
+  subtotal              Float
+  platformFee           Float         @default(0)
+  taxRate               Float         @default(0)
+  taxAmount             Float         @default(0)
+  taxId                 String?
+  total                 Float
+  currency              String        @default("USD")
+  status                InvoiceStatus @default(DRAFT)
+  invoiceType           String        @default("RETAINER") // RETAINER | HOURLY | MILESTONE
+  periodStart           DateTime?
+  periodEnd             DateTime?
+  recipientEmail        String?
+  recipientName         String?
+  pdfUrl                String?
+  dueDate               DateTime?
+  paidAt                DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   engagement   Engagement?   @relation(fields: [engagementId], references: [id], onDelete: SetNull)
   lines        InvoiceLine[]
   refunds      Refund[]
+  disputes     Dispute[]
 
   @@index([organizationId])
   @@index([status])
+  @@index([invoiceType])
 }
 
 model InvoiceLine {
@@ -1174,18 +1210,29 @@ model InvoiceLine {
 }
 
 model LedgerEntry {
-  id          String          @id @default(cuid())
-  account     String          // ESCROW | PLATFORM_FEES | STRATEGIST_PAYABLE | DISPUTE_RESERVE
-  direction   LedgerDirection
-  amount      Float
-  currency    String          @default("USD")
-  refType     String          // INVOICE | PAYOUT | ESCROW_RELEASE | REFUND
-  refId       String
-  description String?
-  createdAt   DateTime        @default(now())
+  id                  String          @id @default(cuid())
+  transactionId       String          // Groups the balanced entries together
+  account             String          // CLIENT_FUNDS | ESCROW | PLATFORM_REVENUE | STRATEGIST_PAYABLE | PAYOUTS | REFUNDS
+  direction           LedgerDirection // DEBIT | CREDIT
+  amount              Int             // Stored in minor units (cents)
+  currency            String          @default("USD")
+  idempotencyKey      String?
+  refType             String          // MILESTONE_FUNDING | ESCROW_RELEASE | RETAINER_PAYMENT | HOURLY_PAYMENT | PAYOUT | REFUND | DISPUTE_FREEZE | DISPUTE_RESOLUTION
+  refId               String?
+  description         String?
+  organizationId      String?
+  engagementId        String?
+  strategistProfileId String?
+  metadata            Json?
+  createdAt           DateTime        @default(now())
 
+  @@index([transactionId])
   @@index([account])
+  @@index([idempotencyKey])
   @@index([refType, refId])
+  @@index([engagementId])
+  @@index([organizationId])
+  @@index([strategistProfileId])
 }
 
 model EscrowAccount {
@@ -1200,33 +1247,50 @@ model EscrowAccount {
 }
 
 model Payout {
-  id                 String       @id @default(cuid())
+  id                  String       @id @default(cuid())
   strategistProfileId String
-  amount             Float
-  currency           String       @default("USD")
-  status             PayoutStatus @default(PENDING)
-  stripeTransferId   String?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  amount              Float
+  currency            String       @default("USD")
+  status              PayoutStatus @default(PENDING)
+  stripeTransferId    String?
+  failureReason       String?
+  transactionId       String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   strategistProfile StrategistProfile @relation(fields: [strategistProfileId], references: [id], onDelete: Cascade)
 
   @@index([strategistProfileId])
+  @@index([status])
 }
 
 model Dispute {
-  id              String        @id @default(cuid())
-  engagementId    String
-  initiatedById   String
-  reason          String        @db.Text
-  status          DisputeStatus @default(OPEN)
-  resolutionNotes String?       @db.Text
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                     String        @id @default(cuid())
+  engagementId           String
+  milestoneId            String?
+  invoiceId              String?
+  initiatedById          String
+  reason                 String        @db.Text
+  status                 DisputeStatus @default(OPEN)
+  evidence               Json?         // Array of { name, url, size }
+  amount                 Float?
+  resolutionOutcome      String?       // FULL_CLIENT_REFUND | FULL_STRATEGIST_PAYOUT | SPLIT | DISMISSED
+  clientRefundAmount     Float?
+  strategistPayoutAmount Float?
+  resolutionNotes        String?       @db.Text
+  resolvedAt             DateTime?
+  resolvedById           String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
   engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  milestone  Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  invoice    Invoice?   @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([engagementId])
+  @@index([milestoneId])
+  @@index([invoiceId])
+  @@index([status])
 }
 
 model Refund {
@@ -1240,6 +1304,17 @@ model Refund {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+}
+
+model IdempotencyRecord {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  action    String
+  response  Json?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([key])
 }
 
 // ==============================================================================
