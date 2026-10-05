@@ -35,6 +35,7 @@ import CadenceTab from "@/components/engagements/cadence-tab";
 import TimeTab from "@/components/engagements/time-tab";
 import FilesTab from "@/components/engagements/files-tab";
 import ActivityTab from "@/components/engagements/activity-tab";
+import MoneyTab from "@/components/engagements/money-tab";
 import ContractViewerModal from "@/components/engagements/contract-viewer-modal";
 import EngagementControlsModal from "@/components/engagements/engagement-controls-modal";
 
@@ -173,6 +174,12 @@ export default function EngagementWorkspace({
       count: weeklyUpdates.length,
     },
     { id: "time", label: "Time Tracking", icon: Clock },
+    {
+      id: "money",
+      label: "Escrow & Money",
+      icon: DollarSign,
+      count: engagement?.milestones?.length,
+    },
     {
       id: "files",
       label: "Files & Assets",
@@ -409,6 +416,16 @@ export default function EngagementWorkspace({
             timeEntries={timeEntries}
             deliverables={deliverables}
             currentWeekMetrics={currentWeekMetrics}
+            userRole={userRole}
+            isClosed={isClosed}
+            onRefresh={fetchEngagement}
+          />
+        )}
+
+        {activeTab === "money" && (
+          <MoneyTab
+            engagement={engagement}
+            milestones={engagement?.milestones || []}
             userRole={userRole}
             isClosed={isClosed}
             onRefresh={fetchEngagement}
