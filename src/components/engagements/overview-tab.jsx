@@ -298,3 +298,5 @@ export function OverviewTab({
     </div>
   );
 }
+
+export default OverviewTab;

@@ -496,3 +496,5 @@ export function ContractViewerModal({
     </div>
   );
 }
+
+export default ContractViewerModal;

@@ -372,3 +372,5 @@ export function CadenceTab({
     </div>
   );
 }
+
+export default CadenceTab;

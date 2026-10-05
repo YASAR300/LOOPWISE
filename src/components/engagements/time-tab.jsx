@@ -454,3 +454,5 @@ export function TimeTab({
     </div>
   );
 }
+
+export default TimeTab;
